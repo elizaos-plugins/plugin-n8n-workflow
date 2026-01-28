@@ -1,0 +1,47 @@
+{
+  "name": "@elizaos/plugin-n8n-workflow",
+  "version": "0.1.0",
+  "description": "ElizaOS plugin for generating and managing n8n workflows from natural language",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "bun test",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "keywords": [
+    "elizaos",
+    "plugin",
+    "n8n",
+    "workflow",
+    "automation",
+    "ai",
+    "natural-language"
+  ],
+  "author": "Eliza Cloud Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elizaos-plugins/plugin-n8n-workflow.git"
+  },
+  "bugs": {
+    "url": "https://github.com/elizaos-plugins/plugin-n8n-workflow/issues"
+  },
+  "homepage": "https://github.com/elizaos-plugins/plugin-n8n-workflow#readme",
+  "peerDependencies": {
+    "@elizaos/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.10",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
