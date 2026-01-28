@@ -111,24 +111,48 @@ When used with `@eliza-cloud/plugin-oauth`, the plugin automatically handles OAu
 
 ## Architecture
 
+### Clean Code Organization
+
+```
+src/
+├── api/              # n8n API client
+│   └── client.ts     # Full REST API coverage
+├── catalog/          # Node catalog & search
+│   └── search.ts     # Keyword-based node search
+├── generation/       # LLM workflow generation
+│   ├── keywords.ts   # Keyword extraction (OBJECT_SMALL)
+│   └── generator.ts  # Workflow generation (TEXT_LARGE)
+├── workflow/         # Workflow manipulation
+│   ├── validator.ts  # Structural validation
+│   └── positioner.ts # Auto-layout algorithm
+├── credentials/      # Credential management
+│   └── resolver.ts   # 3-mode resolution (cloud/local/placeholder)
+├── services/         # ElizaOS services
+├── actions/          # ElizaOS actions
+├── providers/        # ElizaOS providers
+├── types/            # TypeScript definitions
+├── prompts/          # LLM prompts
+└── data/             # Static data (node catalog)
+```
+
 ### RAG Pipeline
 
 ```
 User Prompt
     ↓
-1. Keyword Extraction (LLM)
+1. Keyword Extraction (LLM - OBJECT_SMALL)
     ↓
-2. Node Catalog Search (Local)
+2. Node Catalog Search (Local - 457 nodes)
     ↓
-3. Workflow Generation (LLM)
+3. Workflow Generation (LLM - TEXT_LARGE)
     ↓
 4. Validation + Auto-fix
     ↓
-5. Node Positioning
+5. Node Positioning (Breadth-first layout)
     ↓
-6. Credential Injection
+6. Credential Resolution (3 modes)
     ↓
-7. Deploy to n8n Cloud
+7. Deploy to n8n Cloud (REST API)
 ```
 
 ### Dual Mode Operation
@@ -139,7 +163,7 @@ User Prompt
 - Workflow deployed with placeholders or pre-configured IDs
 
 **Cloud Mode:**
-- Integrates with `@eliza-cloud/plugin-oauth`
+- Integrates with `@eliza-cloud/plugin-oauth` (duck typing)
 - Automatic OAuth flow for app connections
 - Seamless credential injection via n8n API
 
@@ -148,6 +172,7 @@ User Prompt
 This plugin combines patterns from:
 - **n8n-intelligence**: RAG pipeline, keyword extraction, node catalog, workflow generation
 - **n8n-workflow-builder**: n8n API client, validation, positioning, credential management
+- **ElizaOS v2.0.0**: Plugin architecture, ModelType API, services pattern
 
 ## Development
 
@@ -163,6 +188,12 @@ bun run dev
 
 # Run tests
 bun test
+
+# Lint
+bun run lint
+
+# Format
+bun run format
 ```
 
 ## License
