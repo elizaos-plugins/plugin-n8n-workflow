@@ -1,4 +1,5 @@
 import type { IAgentRuntime } from "@elizaos/core";
+import { ModelType } from "@elizaos/core";
 import { N8nWorkflow, NodeDefinition } from "../types/index.js";
 import { WORKFLOW_GENERATION_SYSTEM_PROMPT } from "../prompts/index.js";
 
@@ -25,24 +26,26 @@ export async function generateWorkflow(
   userPrompt: string,
   relevantNodes: NodeDefinition[],
 ): Promise<N8nWorkflow> {
-  // Build system prompt with relevant node definitions
-  const systemPrompt = `${WORKFLOW_GENERATION_SYSTEM_PROMPT}
+  // Build full prompt with system instructions + relevant nodes + user request
+  const fullPrompt = `${WORKFLOW_GENERATION_SYSTEM_PROMPT}
 
 ## Relevant Nodes Available
 
 ${JSON.stringify(relevantNodes, null, 2)}
 
-Use these node definitions to generate the workflow. Each node's "properties" field defines the available parameters.`;
+Use these node definitions to generate the workflow. Each node's "properties" field defines the available parameters.
 
-  // Call LLM with temperature 0 for deterministic output
-  const response = await runtime.useModel({
-    model: runtime.modelProvider.large, // Use large model for complex generation
-    systemPrompt,
-    userPrompt,
+## User Request
+
+${userPrompt}
+
+Generate a valid n8n workflow JSON that fulfills this request.`;
+
+  // Use TEXT_LARGE with JSON response format
+  const response = await runtime.useModel(ModelType.TEXT_LARGE, {
+    prompt: fullPrompt,
     temperature: 0,
-    responseFormat: {
-      type: "json_object",
-    },
+    responseFormat: { type: "json_object" },
   });
 
   // Parse workflow JSON

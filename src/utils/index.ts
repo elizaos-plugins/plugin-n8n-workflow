@@ -13,3 +13,4 @@ export {
   validateWorkflowOrThrow,
 } from "./workflowValidator.js";
 export { positionNodes } from "./nodePositioner.js";
+export { resolveCredentials } from "./credentialResolver.js";

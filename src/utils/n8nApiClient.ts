@@ -85,7 +85,7 @@ export class N8nApiClient {
    * @see DELETE /workflows/{id}
    */
   async deleteWorkflow(id: string): Promise<void> {
-    await this.request<void>("DELETE", `/workflows/${id}`);
+    await this.request("DELETE", `/workflows/${id}`);
   }
 
   /**
@@ -179,7 +179,7 @@ export class N8nApiClient {
    * @see DELETE /credentials/{id}
    */
   async deleteCredential(id: string): Promise<void> {
-    await this.request<void>("DELETE", `/credentials/${id}`);
+    await this.request("DELETE", `/credentials/${id}`);
   }
 
   // ============================================================================
@@ -221,7 +221,7 @@ export class N8nApiClient {
    * @see DELETE /executions/{id}
    */
   async deleteExecution(id: string): Promise<void> {
-    await this.request<void>("DELETE", `/executions/${id}`);
+    await this.request("DELETE", `/executions/${id}`);
   }
 
   // ============================================================================
@@ -264,7 +264,7 @@ export class N8nApiClient {
   /**
    * Generic request handler with error handling
    */
-  private async request<T>(
+  private async request<T = void>(
     method: string,
     path: string,
     body?: unknown,
@@ -287,13 +287,20 @@ export class N8nApiClient {
       const response = await fetch(url, options);
 
       // Handle empty responses (DELETE, etc.)
-      if (response.status === 204 || response.status === 200) {
+      if (response.status === 204) {
+        // 204 No Content - return undefined for void operations
+        return undefined as T;
+      }
+
+      if (response.status === 200) {
         const text = await response.text();
+        // Empty 200 response - return undefined for void operations
         if (!text) return undefined as T;
+        // Non-empty response - parse JSON
         return JSON.parse(text) as T;
       }
 
-      // Parse response
+      // For other status codes, try to parse JSON for error messages
       const data = await response.json();
 
       // Handle errors

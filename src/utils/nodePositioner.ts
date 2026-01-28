@@ -24,7 +24,7 @@ export function positionNodes(workflow: N8nWorkflow): N8nWorkflow {
       Array.isArray(node.position) &&
       node.position.length === 2 &&
       typeof node.position[0] === "number" &&
-      typeof node.position[1] === "number"
+      typeof node.position[1] === "number",
   );
 
   if (allHavePositions) {
@@ -35,7 +35,7 @@ export function positionNodes(workflow: N8nWorkflow): N8nWorkflow {
   const nodeGraph = buildNodeGraph(positioned);
 
   // Position nodes level by level (breadth-first from triggers)
-  const positioned Nodes = positionByLevels(positioned.nodes, nodeGraph);
+  const positionedNodes = positionByLevels(positioned.nodes, nodeGraph);
 
   positioned.nodes = positionedNodes;
   return positioned;
@@ -77,7 +77,7 @@ function buildNodeGraph(workflow: N8nWorkflow): Map<string, string[]> {
  */
 function positionByLevels(
   nodes: N8nWorkflow["nodes"],
-  graph: Map<string, string[]>
+  graph: Map<string, string[]>,
 ): N8nWorkflow["nodes"] {
   // Find trigger/start nodes (nodes with no incoming connections)
   const incomingCount = new Map<string, number>();
@@ -91,8 +91,9 @@ function positionByLevels(
     }
   }
 
-  const triggerNodes = nodes.filter((node) => incomingCount.get(node.name) === 0);
-  const regularNodes = nodes.filter((node) => incomingCount.get(node.name)! > 0);
+  const triggerNodes = nodes.filter(
+    (node) => incomingCount.get(node.name) === 0,
+  );
 
   // Organize into levels
   const levels: string[][] = [];

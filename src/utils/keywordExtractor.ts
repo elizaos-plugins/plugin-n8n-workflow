@@ -1,4 +1,5 @@
 import type { IAgentRuntime } from "@elizaos/core";
+import { ModelType } from "@elizaos/core";
 import { KeywordExtractionResult } from "../types/index.js";
 import { KEYWORD_EXTRACTION_SYSTEM_PROMPT } from "../prompts/index.js";
 
@@ -20,31 +21,24 @@ export async function extractKeywords(
   runtime: IAgentRuntime,
   userPrompt: string,
 ): Promise<string[]> {
-  const response = await runtime.useModel({
-    model: runtime.modelProvider.small,
-    systemPrompt: KEYWORD_EXTRACTION_SYSTEM_PROMPT,
-    userPrompt,
-    responseFormat: {
-      type: "json_object",
-      schema: {
-        type: "object",
-        properties: {
-          keywords: {
-            type: "array",
-            items: { type: "string" },
-            description: "Up to 5 relevant keywords or phrases",
-          },
+  // Use OBJECT_SMALL for structured JSON output
+  const result = (await runtime.useModel(ModelType.OBJECT_SMALL, {
+    prompt: `${KEYWORD_EXTRACTION_SYSTEM_PROMPT}\n\nUser request: ${userPrompt}`,
+    schema: {
+      type: "object",
+      properties: {
+        keywords: {
+          type: "array",
+          items: { type: "string" },
+          description: "Up to 5 relevant keywords or phrases",
         },
-        required: ["keywords"],
       },
+      required: ["keywords"],
     },
-  });
-
-  // Parse LLM response
-  const result = JSON.parse(response) as KeywordExtractionResult;
+  })) as KeywordExtractionResult;
 
   // Validate structure
-  if (!result.keywords || !Array.isArray(result.keywords)) {
+  if (!result || !result.keywords || !Array.isArray(result.keywords)) {
     throw new Error(
       "Invalid keyword extraction response: missing or invalid keywords array",
     );
