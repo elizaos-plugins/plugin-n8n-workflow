@@ -331,6 +331,14 @@ export interface GetExecutionsParams {
   status?: "success" | "error" | "running" | "waiting";
 }
 
+export interface WorkflowCreationResult {
+  id: string;
+  name: string;
+  active: boolean;
+  nodeCount: number;
+  missingCredentials: string[];
+}
+
 // Provider types
 
 export interface WorkflowStatusInfo {
