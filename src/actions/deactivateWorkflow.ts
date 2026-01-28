@@ -2,7 +2,6 @@ import {
   type Action,
   type ActionExample,
   type ActionResult,
-  type Content,
   type HandlerCallback,
   type IAgentRuntime,
   logger,
@@ -13,19 +12,51 @@ import {
   N8N_WORKFLOW_SERVICE_TYPE,
   type N8nWorkflowService,
 } from "../services/index.js";
+import { matchWorkflow } from "../generation/index.js";
+import type { N8nWorkflow } from "../types/index.js";
 
 const examples: ActionExample[][] = [
   [
     {
       name: "{{user1}}",
       content: {
-        text: "Pause workflow abc123",
+        text: "Pause my Stripe workflow",
       },
     },
     {
       name: "{{agent}}",
       content: {
         text: "I'll deactivate that workflow for you.",
+        actions: ["DEACTIVATE_N8N_WORKFLOW"],
+      },
+    },
+  ],
+  [
+    {
+      name: "{{user1}}",
+      content: {
+        text: "Stop the email automation",
+      },
+    },
+    {
+      name: "{{agent}}",
+      content: {
+        text: "Stopping email workflow.",
+        actions: ["DEACTIVATE_N8N_WORKFLOW"],
+      },
+    },
+  ],
+  [
+    {
+      name: "{{user1}}",
+      content: {
+        text: "Turn off workflow xyz789",
+      },
+    },
+    {
+      name: "{{agent}}",
+      content: {
+        text: "Deactivating workflow xyz789.",
         actions: ["DEACTIVATE_N8N_WORKFLOW"],
       },
     },
@@ -42,27 +73,11 @@ export const deactivateWorkflowAction: Action = {
     "TURN_OFF_WORKFLOW",
   ],
   description:
-    "Deactivate an n8n workflow to stop it from processing triggers and running automatically.",
+    "Deactivate an n8n workflow to stop it from processing triggers and running automatically. Identifies workflows by ID, name, or semantic description in any language.",
 
-  validate: async (
-    runtime: IAgentRuntime,
-    message: Memory,
-    _state?: State,
-  ): Promise<boolean> => {
+  validate: async (runtime: IAgentRuntime): Promise<boolean> => {
     const service = runtime.getService(N8N_WORKFLOW_SERVICE_TYPE);
-    if (!service) {
-      return false;
-    }
-
-    const text = (message.content as Content).text?.toLowerCase() ?? "";
-    return (
-      (text.includes("deactivate") ||
-        text.includes("disable") ||
-        text.includes("stop") ||
-        text.includes("pause") ||
-        text.includes("turn off")) &&
-      text.includes("workflow")
-    );
+    return !!service;
   },
 
   handler: async (
@@ -77,7 +92,10 @@ export const deactivateWorkflowAction: Action = {
     );
 
     if (!service) {
-      logger.error("N8n Workflow service not available");
+      logger.error(
+        { src: "plugin:n8n-workflow:action:deactivate" },
+        "N8n Workflow service not available",
+      );
       if (callback) {
         await callback({
           text: "N8n Workflow service is not available.",
@@ -87,24 +105,56 @@ export const deactivateWorkflowAction: Action = {
     }
 
     try {
-      const workflowId = (state?.workflowId as string) || "";
+      const workflows = (state?.data?.workflows as N8nWorkflow[]) || [];
 
-      if (!workflowId) {
+      if (workflows.length === 0) {
         if (callback) {
           await callback({
-            text: "Please provide a workflow ID.",
+            text: "No workflows available to deactivate.",
           });
         }
         return { success: false };
       }
 
-      await service.deactivateWorkflow(workflowId);
+      // Build conversation context for semantic matching
+      const recentMessages = (state?.data?.recentMessages as Memory[]) || [];
+      const conversationContext = recentMessages
+        .slice(-5)
+        .map(
+          (m) =>
+            `${m.entityId === runtime.agentId ? "Assistant" : "User"}: ${m.content.text}`,
+        )
+        .join("\n");
 
-      logger.info(`Deactivated workflow ${workflowId}`);
+      const fullContext = conversationContext
+        ? `Recent conversation:\n${conversationContext}\n\nCurrent request: ${message.content.text || ""}`
+        : message.content.text || "";
+
+      const matchResult = await matchWorkflow(runtime, fullContext, workflows);
+
+      if (!matchResult.matchedWorkflowId || matchResult.confidence === "none") {
+        const workflowList = matchResult.matches
+          .map((m) => `- ${m.name} (ID: ${m.id})`)
+          .join("\n");
+
+        if (callback) {
+          await callback({
+            text: `Could not identify which workflow to deactivate. Available workflows:\n${workflowList}`,
+          });
+        }
+        return { success: false };
+      }
+
+      await service.deactivateWorkflow(matchResult.matchedWorkflowId);
+
+      logger.info(
+        { src: "plugin:n8n-workflow:action:deactivate" },
+        `Deactivated workflow ${matchResult.matchedWorkflowId}`,
+      );
 
       if (callback) {
         await callback({
-          text: `⏸️  Workflow ${workflowId} has been deactivated and will no longer run automatically.`,
+          text: "⏸️  Workflow deactivated and will no longer run automatically.",
         });
       }
 
@@ -112,7 +162,10 @@ export const deactivateWorkflowAction: Action = {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
-      logger.error(`Failed to deactivate workflow: ${errorMessage}`);
+      logger.error(
+        { src: "plugin:n8n-workflow:action:deactivate" },
+        `Failed to deactivate workflow: ${errorMessage}`,
+      );
 
       if (callback) {
         await callback({

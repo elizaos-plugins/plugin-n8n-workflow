@@ -4,4 +4,4 @@ export {
   getNodesByCategory,
   getNodesByCredentialType,
   getCatalogStats,
-} from "./search.js";
+} from './search.js';

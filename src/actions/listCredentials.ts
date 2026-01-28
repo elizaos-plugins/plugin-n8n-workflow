@@ -84,7 +84,10 @@ export const listCredentialsAction: Action = {
     );
 
     if (!service) {
-      logger.error("N8n Workflow service not available");
+      logger.error(
+        { src: "plugin:n8n-workflow:action:list-credentials" },
+        "N8n Workflow service not available",
+      );
       if (callback) {
         await callback({
           text: "N8n Workflow service is not available.",
@@ -96,7 +99,10 @@ export const listCredentialsAction: Action = {
     try {
       const credentials = await service.listCredentials();
 
-      logger.info(`Retrieved ${credentials.length} credentials`);
+      logger.info(
+        { src: "plugin:n8n-workflow:action:list-credentials" },
+        `Retrieved ${credentials.length} credentials`,
+      );
 
       if (credentials.length === 0) {
         if (callback) {
@@ -118,19 +124,20 @@ export const listCredentialsAction: Action = {
         responseText += `   Created: ${new Date(cred.createdAt).toLocaleDateString()}\n\n`;
       }
 
-      responseText += `\n💡 **Tip:** To use pre-configured credentials in workflows, add them to your character settings:\n`;
-      responseText += `\`\`\`json\n`;
-      responseText += `{\n`;
-      responseText += `  "settings": {\n`;
-      responseText += `    "n8n": {\n`;
-      responseText += `      "credentials": {\n`;
-      responseText += `        "gmailOAuth2Api": "YOUR_GMAIL_CRED_ID",\n`;
-      responseText += `        "slackApi": "YOUR_SLACK_CRED_ID"\n`;
-      responseText += `      }\n`;
-      responseText += `    }\n`;
-      responseText += `  }\n`;
-      responseText += `}\n`;
-      responseText += `\`\`\``;
+      responseText +=
+        "\n💡 **Tip:** To use pre-configured credentials in workflows, add them to your character settings:\n";
+      responseText += "```json\n";
+      responseText += "{\n";
+      responseText += '  "settings": {\n';
+      responseText += '    "n8n": {\n';
+      responseText += '      "credentials": {\n';
+      responseText += '        "gmailOAuth2Api": "YOUR_GMAIL_CRED_ID",\n';
+      responseText += '        "slackApi": "YOUR_SLACK_CRED_ID"\n';
+      responseText += "      }\n";
+      responseText += "    }\n";
+      responseText += "  }\n";
+      responseText += "}\n";
+      responseText += "```";
 
       if (callback) {
         await callback({
@@ -145,7 +152,10 @@ export const listCredentialsAction: Action = {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
-      logger.error(`Failed to list credentials: ${errorMessage}`);
+      logger.error(
+        { src: "plugin:n8n-workflow:action:list-credentials" },
+        `Failed to list credentials: ${errorMessage}`,
+      );
 
       if (callback) {
         await callback({

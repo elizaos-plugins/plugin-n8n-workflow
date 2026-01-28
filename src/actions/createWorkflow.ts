@@ -142,7 +142,10 @@ export const createWorkflowAction: Action = {
     );
 
     if (!service) {
-      logger.error("N8n Workflow service not available");
+      logger.error(
+        { src: "plugin:n8n-workflow:action:create" },
+        "N8n Workflow service not available",
+      );
       if (callback) {
         await callback({
           text: "N8n Workflow service is not available. Please ensure the plugin is properly configured with N8N_API_KEY and N8N_HOST.",
@@ -156,7 +159,10 @@ export const createWorkflowAction: Action = {
       const prompt = (content.text ?? "").trim();
 
       if (!prompt) {
-        logger.error("No prompt provided for workflow creation");
+        logger.error(
+          { src: "plugin:n8n-workflow:action:create" },
+          "No prompt provided for workflow creation",
+        );
         if (callback) {
           await callback({
             text: "Please provide a description of the workflow you want to create.",
@@ -165,7 +171,10 @@ export const createWorkflowAction: Action = {
         return { success: false };
       }
 
-      logger.info(`Creating workflow from prompt: ${prompt.slice(0, 100)}...`);
+      logger.info(
+        { src: "plugin:n8n-workflow:action:create" },
+        `Creating workflow from prompt: ${prompt.slice(0, 100)}...`,
+      );
 
       if (callback) {
         await callback({
@@ -180,6 +189,7 @@ export const createWorkflowAction: Action = {
       );
 
       logger.info(
+        { src: "plugin:n8n-workflow:action:create" },
         `Workflow created successfully: ${result.id} (${result.nodeCount} nodes)`,
       );
 
@@ -190,14 +200,16 @@ export const createWorkflowAction: Action = {
       responseText += `**Status:** ${result.active ? "Active" : "Inactive"}\n`;
 
       if (result.missingCredentials.length > 0) {
-        responseText += `\n⚠️  **Action Required:**\n`;
-        responseText += `Please connect the following services in n8n Cloud:\n`;
+        responseText += "\n⚠️  **Action Required:**\n";
+        responseText += "Please connect the following services in n8n Cloud:\n";
         for (const credType of result.missingCredentials) {
           responseText += `- ${credType}\n`;
         }
-        responseText += `\nThe workflow will be ready to run once these connections are configured.`;
+        responseText +=
+          "\nThe workflow will be ready to run once these connections are configured.";
       } else {
-        responseText += `\n✅ All credentials configured - workflow is ready to run!`;
+        responseText +=
+          "\n✅ All credentials configured - workflow is ready to run!";
       }
 
       if (callback) {
@@ -213,7 +225,10 @@ export const createWorkflowAction: Action = {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
-      logger.error(`Failed to create workflow: ${errorMessage}`);
+      logger.error(
+        { src: "plugin:n8n-workflow:action:create" },
+        `Failed to create workflow: ${errorMessage}`,
+      );
 
       if (callback) {
         await callback({

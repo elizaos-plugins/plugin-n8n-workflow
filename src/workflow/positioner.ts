@@ -1,4 +1,4 @@
-import { N8nWorkflow } from "../types/index.js";
+import { N8nWorkflow } from '../types/index.js';
 
 /**
  * Auto-position nodes on workflow canvas
@@ -23,8 +23,8 @@ export function positionNodes(workflow: N8nWorkflow): N8nWorkflow {
       node.position &&
       Array.isArray(node.position) &&
       node.position.length === 2 &&
-      typeof node.position[0] === "number" &&
-      typeof node.position[1] === "number",
+      typeof node.position[0] === 'number' &&
+      typeof node.position[1] === 'number',
   );
 
   if (allHavePositions) {
@@ -76,9 +76,9 @@ function buildNodeGraph(workflow: N8nWorkflow): Map<string, string[]> {
  * Position nodes by levels (breadth-first layout)
  */
 function positionByLevels(
-  nodes: N8nWorkflow["nodes"],
+  nodes: N8nWorkflow['nodes'],
   graph: Map<string, string[]>,
-): N8nWorkflow["nodes"] {
+): N8nWorkflow['nodes'] {
   // Find trigger/start nodes (nodes with no incoming connections)
   const incomingCount = new Map<string, number>();
   for (const node of nodes) {
@@ -108,11 +108,11 @@ function positionByLevels(
   while (queue.length > 0) {
     const { name, level } = queue.shift()!;
 
-    if (visited.has(name)) continue;
+    if (visited.has(name)) {continue;}
     visited.add(name);
 
     // Add to level
-    if (!levels[level]) levels[level] = [];
+    if (!levels[level]) {levels[level] = [];}
     levels[level].push(name);
 
     // Add children to next level

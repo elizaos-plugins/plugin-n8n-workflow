@@ -1,5 +1,5 @@
-import { NodeDefinition, NodeSearchResult } from "../types/index.js";
-import defaultNodesData from "../data/defaultNodes.json" assert { type: "json" };
+import { NodeDefinition, NodeSearchResult } from '../types/index.js';
+import defaultNodesData from '../data/defaultNodes.json' assert { type: 'json' };
 
 /**
  * n8n node catalog with keyword-based search
@@ -47,7 +47,7 @@ export function searchNodes(
 
     const nodeName = node.name.toLowerCase();
     const nodeDisplayName = node.displayName.toLowerCase();
-    const nodeDescription = node.description?.toLowerCase() || "";
+    const nodeDescription = node.description?.toLowerCase() || '';
 
     for (const keyword of normalizedKeywords) {
       // Exact name match (highest priority)
@@ -85,7 +85,7 @@ export function searchNodes(
     return {
       node,
       score,
-      matchReason: matchReasons.join(", ") || "no strong match",
+      matchReason: matchReasons.join(', ') || 'no strong match',
     };
   });
 
@@ -151,7 +151,7 @@ export function getCatalogStats() {
     totalNodes: NODE_CATALOG.length,
     categories: Array.from(categories).sort(),
     credentialTypes: Array.from(credentialTypes).sort(),
-    lastUpdated: "2025-04-26", // From git log
+    lastUpdated: '2025-04-26', // From git log
   };
 }
 

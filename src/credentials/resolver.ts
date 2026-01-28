@@ -1,4 +1,4 @@
-import type { IAgentRuntime } from "@elizaos/core";
+import { type IAgentRuntime, logger } from '@elizaos/core';
 import {
   N8nWorkflow,
   OAuthService,
@@ -8,8 +8,8 @@ import {
   N8nPluginConfig,
   N8nCredentialSchema,
   UserTokens,
-} from "../types/index.js";
-import { N8nApiClient } from "../api/index.js";
+} from '../types/index.js';
+import { N8nApiClient } from '../api/index.js';
 
 /**
  * Resolve and inject credentials into workflow
@@ -45,7 +45,7 @@ export async function resolveCredentials(
   }
 
   // Try to get OAuth service (cloud mode)
-  const oauthService = runtime.getService("oauth");
+  const oauthService = runtime.getService('oauth');
   const hasOAuthService = oauthService && isOAuthService(oauthService);
 
   const injectedCredentials = new Map<string, string>();
@@ -175,9 +175,8 @@ async function resolveWithOAuth(
 
     return credential.id;
   } catch (error) {
-    console.error(
-      `[credential-resolver] Failed to create credential for ${credType}:`,
-      error,
+    logger.error(
+      `Failed to create credential for ${credType}: ${error instanceof Error ? error.message : String(error)}`,
     );
     missingConnections.push({
       credType,
@@ -204,7 +203,7 @@ function buildCredentialData(
     data.oauthTokenData = {
       access_token: tokens.accessToken,
       refresh_token: tokens.refreshToken,
-      token_type: tokens.tokenType || "Bearer",
+      token_type: tokens.tokenType || 'Bearer',
       expires_in: tokens.expiresIn || 3600,
       scope: appConfig?.scope || tokens.scope,
     };
@@ -239,9 +238,9 @@ function buildCredentialData(
   for (const [field, fieldSchema] of Object.entries(schema.properties)) {
     if (
       data[field] === undefined &&
-      typeof fieldSchema === "object" &&
+      typeof fieldSchema === 'object' &&
       fieldSchema !== null &&
-      "default" in fieldSchema &&
+      'default' in fieldSchema &&
       fieldSchema.default !== undefined
     ) {
       data[field] = fieldSchema.default;
@@ -260,7 +259,7 @@ function injectCredentialIds(
 ): N8nWorkflow {
   const injected = { ...workflow };
   injected.nodes = workflow.nodes.map((node) => {
-    if (!node.credentials) return node;
+    if (!node.credentials) {return node;}
 
     const updatedCredentials: typeof node.credentials = {};
 
@@ -293,17 +292,17 @@ function injectCredentialIds(
  */
 function getCredentialDisplayName(credType: string): string {
   const mapping: Record<string, string> = {
-    gmailOAuth2Api: "Gmail",
-    googleSheetsOAuth2Api: "Google Sheets",
-    googleCalendarOAuth2Api: "Google Calendar",
-    googleDriveOAuth2Api: "Google Drive",
-    slackOAuth2Api: "Slack",
-    notionOAuth2Api: "Notion",
-    githubOAuth2Api: "GitHub",
-    stripeApi: "Stripe",
-    airtableTokenApi: "Airtable",
-    telegramApi: "Telegram",
-    discordBotApi: "Discord",
+    gmailOAuth2Api: 'Gmail',
+    googleSheetsOAuth2Api: 'Google Sheets',
+    googleCalendarOAuth2Api: 'Google Calendar',
+    googleDriveOAuth2Api: 'Google Drive',
+    slackOAuth2Api: 'Slack',
+    notionOAuth2Api: 'Notion',
+    githubOAuth2Api: 'GitHub',
+    stripeApi: 'Stripe',
+    airtableTokenApi: 'Airtable',
+    telegramApi: 'Telegram',
+    discordBotApi: 'Discord',
   };
 
   return mapping[credType] || credType;
@@ -316,8 +315,8 @@ function getProviderName(credType: string): string {
   // Extract provider name from credential type
   // e.g., "gmailOAuth2Api" → "gmail", "stripeApi" → "stripe"
   return credType
-    .replace(/OAuth2Api$/, "")
-    .replace(/Api$/, "")
-    .replace(/TokenApi$/, "")
+    .replace(/OAuth2Api$/, '')
+    .replace(/Api$/, '')
+    .replace(/TokenApi$/, '')
     .toLowerCase();
 }

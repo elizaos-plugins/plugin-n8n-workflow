@@ -97,7 +97,10 @@ export const listWorkflowsAction: Action = {
     );
 
     if (!service) {
-      logger.error("N8n Workflow service not available");
+      logger.error(
+        { src: "plugin:n8n-workflow:action:list" },
+        "N8n Workflow service not available",
+      );
       if (callback) {
         await callback({
           text: "N8n Workflow service is not available.",
@@ -111,6 +114,7 @@ export const listWorkflowsAction: Action = {
       const workflows = await service.listWorkflows(userId);
 
       logger.info(
+        { src: "plugin:n8n-workflow:action:list" },
         `Retrieved ${workflows.length} workflows for user ${userId || "all"}`,
       );
 
@@ -146,7 +150,10 @@ export const listWorkflowsAction: Action = {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
-      logger.error(`Failed to list workflows: ${errorMessage}`);
+      logger.error(
+        { src: "plugin:n8n-workflow:action:list" },
+        `Failed to list workflows: ${errorMessage}`,
+      );
 
       if (callback) {
         await callback({

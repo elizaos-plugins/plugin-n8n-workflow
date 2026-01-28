@@ -2,7 +2,6 @@ import {
   type Action,
   type ActionExample,
   type ActionResult,
-  type Content,
   type HandlerCallback,
   type IAgentRuntime,
   logger,
@@ -13,13 +12,15 @@ import {
   N8N_WORKFLOW_SERVICE_TYPE,
   type N8nWorkflowService,
 } from "../services/index.js";
+import { matchWorkflow } from "../generation/index.js";
+import type { N8nWorkflow } from "../types/index.js";
 
 const examples: ActionExample[][] = [
   [
     {
       name: "{{user1}}",
       content: {
-        text: "Delete workflow abc123",
+        text: "Delete the old payment workflow",
       },
     },
     {
@@ -30,29 +31,47 @@ const examples: ActionExample[][] = [
       },
     },
   ],
+  [
+    {
+      name: "{{user1}}",
+      content: {
+        text: "Remove workflow abc123",
+      },
+    },
+    {
+      name: "{{agent}}",
+      content: {
+        text: "Deleting workflow abc123.",
+        actions: ["DELETE_N8N_WORKFLOW"],
+      },
+    },
+  ],
+  [
+    {
+      name: "{{user1}}",
+      content: {
+        text: "Get rid of the broken email automation",
+      },
+    },
+    {
+      name: "{{agent}}",
+      content: {
+        text: "Removing that workflow.",
+        actions: ["DELETE_N8N_WORKFLOW"],
+      },
+    },
+  ],
 ];
 
 export const deleteWorkflowAction: Action = {
   name: "DELETE_N8N_WORKFLOW",
   similes: ["DELETE_WORKFLOW", "REMOVE_WORKFLOW", "DESTROY_WORKFLOW"],
   description:
-    "Delete an n8n workflow permanently. This action cannot be undone.",
+    "Delete an n8n workflow permanently. This action cannot be undone. Identifies workflows by ID, name, or semantic description in any language.",
 
-  validate: async (
-    runtime: IAgentRuntime,
-    message: Memory,
-    _state?: State,
-  ): Promise<boolean> => {
+  validate: async (runtime: IAgentRuntime): Promise<boolean> => {
     const service = runtime.getService(N8N_WORKFLOW_SERVICE_TYPE);
-    if (!service) {
-      return false;
-    }
-
-    const text = (message.content as Content).text?.toLowerCase() ?? "";
-    return (
-      (text.includes("delete") || text.includes("remove")) &&
-      text.includes("workflow")
-    );
+    return !!service;
   },
 
   handler: async (
@@ -67,7 +86,10 @@ export const deleteWorkflowAction: Action = {
     );
 
     if (!service) {
-      logger.error("N8n Workflow service not available");
+      logger.error(
+        { src: "plugin:n8n-workflow:action:delete" },
+        "N8n Workflow service not available",
+      );
       if (callback) {
         await callback({
           text: "N8n Workflow service is not available.",
@@ -77,24 +99,56 @@ export const deleteWorkflowAction: Action = {
     }
 
     try {
-      const workflowId = (state?.workflowId as string) || "";
+      const workflows = (state?.data?.workflows as N8nWorkflow[]) || [];
 
-      if (!workflowId) {
+      if (workflows.length === 0) {
         if (callback) {
           await callback({
-            text: "Please provide a workflow ID.",
+            text: "No workflows available to delete.",
           });
         }
         return { success: false };
       }
 
-      await service.deleteWorkflow(workflowId);
+      // Build conversation context for semantic matching
+      const recentMessages = (state?.data?.recentMessages as Memory[]) || [];
+      const conversationContext = recentMessages
+        .slice(-5)
+        .map(
+          (m) =>
+            `${m.entityId === runtime.agentId ? "Assistant" : "User"}: ${m.content.text}`,
+        )
+        .join("\n");
 
-      logger.info(`Deleted workflow ${workflowId}`);
+      const fullContext = conversationContext
+        ? `Recent conversation:\n${conversationContext}\n\nCurrent request: ${message.content.text || ""}`
+        : message.content.text || "";
+
+      const matchResult = await matchWorkflow(runtime, fullContext, workflows);
+
+      if (!matchResult.matchedWorkflowId || matchResult.confidence === "none") {
+        const workflowList = matchResult.matches
+          .map((m) => `- ${m.name} (ID: ${m.id})`)
+          .join("\n");
+
+        if (callback) {
+          await callback({
+            text: `Could not identify which workflow to delete. Available workflows:\n${workflowList}`,
+          });
+        }
+        return { success: false };
+      }
+
+      await service.deleteWorkflow(matchResult.matchedWorkflowId);
+
+      logger.info(
+        { src: "plugin:n8n-workflow:action:delete" },
+        `Deleted workflow ${matchResult.matchedWorkflowId}`,
+      );
 
       if (callback) {
         await callback({
-          text: `🗑️  Workflow ${workflowId} has been deleted permanently.`,
+          text: "🗑️  Workflow deleted permanently.",
         });
       }
 
@@ -102,7 +156,10 @@ export const deleteWorkflowAction: Action = {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
-      logger.error(`Failed to delete workflow: ${errorMessage}`);
+      logger.error(
+        { src: "plugin:n8n-workflow:action:delete" },
+        `Failed to delete workflow: ${errorMessage}`,
+      );
 
       if (callback) {
         await callback({

@@ -1,6 +1,6 @@
-import type { IAgentRuntime, ModelType } from "@elizaos/core";
-import { KeywordExtractionResult } from "../types/index.js";
-import { KEYWORD_EXTRACTION_SYSTEM_PROMPT } from "../prompts/index.js";
+import type { IAgentRuntime, ModelType } from '@elizaos/core';
+import { KeywordExtractionResult } from '../types/index.js';
+import { KEYWORD_EXTRACTION_SYSTEM_PROMPT } from '../prompts/index.js';
 
 /**
  * Extracts keywords from user prompt using LLM
@@ -24,28 +24,28 @@ export async function extractKeywords(
   const result = (await runtime.useModel(ModelType.OBJECT_SMALL, {
     prompt: `${KEYWORD_EXTRACTION_SYSTEM_PROMPT}\n\nUser request: ${userPrompt}`,
     schema: {
-      type: "object",
+      type: 'object',
       properties: {
         keywords: {
-          type: "array",
-          items: { type: "string" },
-          description: "Up to 5 relevant keywords or phrases",
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Up to 5 relevant keywords or phrases',
         },
       },
-      required: ["keywords"],
+      required: ['keywords'],
     },
   })) as KeywordExtractionResult;
 
   // Validate structure
   if (!result || !result.keywords || !Array.isArray(result.keywords)) {
     throw new Error(
-      "Invalid keyword extraction response: missing or invalid keywords array",
+      'Invalid keyword extraction response: missing or invalid keywords array',
     );
   }
 
   // Validate all items are strings
-  if (!result.keywords.every((kw) => typeof kw === "string")) {
-    throw new Error("Keywords array contains non-string elements");
+  if (!result.keywords.every((kw) => typeof kw === 'string')) {
+    throw new Error('Keywords array contains non-string elements');
   }
 
   // Limit to 5 keywords max, filter empty strings

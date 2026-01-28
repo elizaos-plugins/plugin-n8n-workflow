@@ -2,7 +2,6 @@ import {
   type Action,
   type ActionExample,
   type ActionResult,
-  type Content,
   type HandlerCallback,
   type IAgentRuntime,
   logger,
@@ -13,19 +12,51 @@ import {
   N8N_WORKFLOW_SERVICE_TYPE,
   type N8nWorkflowService,
 } from "../services/index.js";
+import { matchWorkflow } from "../generation/index.js";
+import type { N8nWorkflow } from "../types/index.js";
 
 const examples: ActionExample[][] = [
   [
     {
       name: "{{user1}}",
       content: {
-        text: "Enable workflow abc123",
+        text: "Enable my payment workflow",
       },
     },
     {
       name: "{{agent}}",
       content: {
         text: "I'll activate that workflow for you.",
+        actions: ["ACTIVATE_N8N_WORKFLOW"],
+      },
+    },
+  ],
+  [
+    {
+      name: "{{user1}}",
+      content: {
+        text: "Turn on the Gmail automation",
+      },
+    },
+    {
+      name: "{{agent}}",
+      content: {
+        text: "Activating Gmail workflow now.",
+        actions: ["ACTIVATE_N8N_WORKFLOW"],
+      },
+    },
+  ],
+  [
+    {
+      name: "{{user1}}",
+      content: {
+        text: "Start the Stripe workflow abc123",
+      },
+    },
+    {
+      name: "{{agent}}",
+      content: {
+        text: "Starting workflow abc123.",
         actions: ["ACTIVATE_N8N_WORKFLOW"],
       },
     },
@@ -41,26 +72,11 @@ export const activateWorkflowAction: Action = {
     "TURN_ON_WORKFLOW",
   ],
   description:
-    "Activate an n8n workflow to start processing triggers and running automatically.",
+    "Activate an n8n workflow to start processing triggers and running automatically. Identifies workflows by ID, name, or semantic description in any language.",
 
-  validate: async (
-    runtime: IAgentRuntime,
-    message: Memory,
-    _state?: State,
-  ): Promise<boolean> => {
+  validate: async (runtime: IAgentRuntime): Promise<boolean> => {
     const service = runtime.getService(N8N_WORKFLOW_SERVICE_TYPE);
-    if (!service) {
-      return false;
-    }
-
-    const text = (message.content as Content).text?.toLowerCase() ?? "";
-    return (
-      (text.includes("activate") ||
-        text.includes("enable") ||
-        text.includes("start") ||
-        text.includes("turn on")) &&
-      text.includes("workflow")
-    );
+    return !!service;
   },
 
   handler: async (
@@ -75,7 +91,10 @@ export const activateWorkflowAction: Action = {
     );
 
     if (!service) {
-      logger.error("N8n Workflow service not available");
+      logger.error(
+        { src: "plugin:n8n-workflow:action:activate" },
+        "N8n Workflow service not available",
+      );
       if (callback) {
         await callback({
           text: "N8n Workflow service is not available.",
@@ -85,24 +104,58 @@ export const activateWorkflowAction: Action = {
     }
 
     try {
-      const workflowId = (state?.workflowId as string) || "";
+      // Get workflows from state (activeWorkflowsProvider)
+      const workflows = (state?.data?.workflows as N8nWorkflow[]) || [];
 
-      if (!workflowId) {
+      if (workflows.length === 0) {
         if (callback) {
           await callback({
-            text: "Please provide a workflow ID.",
+            text: "No workflows available to activate.",
           });
         }
         return { success: false };
       }
 
-      await service.activateWorkflow(workflowId);
+      // Build conversation context for LLM
+      const recentMessages = (state?.data?.recentMessages as Memory[]) || [];
+      const conversationContext = recentMessages
+        .slice(-5)
+        .map(
+          (m) =>
+            `${m.entityId === runtime.agentId ? "Assistant" : "User"}: ${m.content.text}`,
+        )
+        .join("\n");
 
-      logger.info(`Activated workflow ${workflowId}`);
+      const fullContext = conversationContext
+        ? `Recent conversation:\n${conversationContext}\n\nCurrent request: ${message.content.text || ""}`
+        : message.content.text || "";
+
+      // Use LLM to match workflow semantically with conversation context
+      const matchResult = await matchWorkflow(runtime, fullContext, workflows);
+
+      if (!matchResult.matchedWorkflowId || matchResult.confidence === "none") {
+        const workflowList = matchResult.matches
+          .map((m) => `- ${m.name} (ID: ${m.id})`)
+          .join("\n");
+
+        if (callback) {
+          await callback({
+            text: `Could not identify which workflow to activate. Available workflows:\n${workflowList}`,
+          });
+        }
+        return { success: false };
+      }
+
+      await service.activateWorkflow(matchResult.matchedWorkflowId);
+
+      logger.info(
+        { src: "plugin:n8n-workflow:action:activate" },
+        `Activated workflow ${matchResult.matchedWorkflowId}`,
+      );
 
       if (callback) {
         await callback({
-          text: `✅ Workflow ${workflowId} has been activated and is now running.`,
+          text: "✅ Workflow activated and is now running.",
         });
       }
 
@@ -110,7 +163,10 @@ export const activateWorkflowAction: Action = {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
-      logger.error(`Failed to activate workflow: ${errorMessage}`);
+      logger.error(
+        { src: "plugin:n8n-workflow:action:activate" },
+        `Failed to activate workflow: ${errorMessage}`,
+      );
 
       if (callback) {
         await callback({

@@ -1,7 +1,7 @@
-import { type Provider } from "@elizaos/core";
+import { type Provider } from '@elizaos/core';
 
 export const capabilitiesProvider: Provider = {
-  name: "n8n_capabilities",
+  name: 'n8n_capabilities',
 
   get: async (): Promise<string> => {
     return `Available n8n workflow operations:

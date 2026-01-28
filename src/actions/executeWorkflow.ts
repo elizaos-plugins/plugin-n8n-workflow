@@ -13,6 +13,7 @@ import {
   N8N_WORKFLOW_SERVICE_TYPE,
   type N8nWorkflowService,
 } from "../services/index.js";
+import { matchWorkflow } from "../generation/index.js";
 
 const examples: ActionExample[][] = [
   [
@@ -74,7 +75,10 @@ export const executeWorkflowAction: Action = {
     );
 
     if (!service) {
-      logger.error("N8n Workflow service not available");
+      logger.error(
+        { src: "plugin:n8n-workflow:action:execute" },
+        "N8n Workflow service not available",
+      );
       if (callback) {
         await callback({
           text: "N8n Workflow service is not available.",
@@ -98,6 +102,7 @@ export const executeWorkflowAction: Action = {
       const execution = await service.executeWorkflow(workflowId);
 
       logger.info(
+        { src: "plugin:n8n-workflow:action:execute" },
         `Executed workflow ${workflowId}, execution ID: ${execution.id}`,
       );
 
@@ -114,7 +119,10 @@ export const executeWorkflowAction: Action = {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
-      logger.error(`Failed to execute workflow: ${errorMessage}`);
+      logger.error(
+        { src: "plugin:n8n-workflow:action:execute" },
+        `Failed to execute workflow: ${errorMessage}`,
+      );
 
       if (callback) {
         await callback({

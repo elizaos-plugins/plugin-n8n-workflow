@@ -2,7 +2,7 @@ import {
   N8nWorkflow,
   WorkflowValidationResult,
   WorkflowValidationError,
-} from "../types/index.js";
+} from '../types/index.js';
 
 /**
  * Validate workflow structure and auto-fix common issues
@@ -19,18 +19,18 @@ export function validateWorkflow(
 
   // 1. Check nodes array exists and is non-empty
   if (!workflow.nodes || !Array.isArray(workflow.nodes)) {
-    errors.push("Missing or invalid nodes array");
+    errors.push('Missing or invalid nodes array');
     return { valid: false, errors, warnings };
   }
 
   if (workflow.nodes.length === 0) {
-    errors.push("Workflow must have at least one node");
+    errors.push('Workflow must have at least one node');
     return { valid: false, errors, warnings };
   }
 
   // 2. Check connections structure
-  if (!workflow.connections || typeof workflow.connections !== "object") {
-    errors.push("Missing or invalid connections object");
+  if (!workflow.connections || typeof workflow.connections !== 'object') {
+    errors.push('Missing or invalid connections object');
     return { valid: false, errors, warnings };
   }
 
@@ -40,12 +40,12 @@ export function validateWorkflow(
 
   for (const node of workflow.nodes) {
     // Check required fields
-    if (!node.name || typeof node.name !== "string") {
-      errors.push("Node missing name");
+    if (!node.name || typeof node.name !== 'string') {
+      errors.push('Node missing name');
       continue;
     }
 
-    if (!node.type || typeof node.type !== "string") {
+    if (!node.type || typeof node.type !== 'string') {
       errors.push(`Node "${node.name}" missing type`);
       continue;
     }
@@ -68,7 +68,7 @@ export function validateWorkflow(
     }
 
     // Check parameters
-    if (!node.parameters || typeof node.parameters !== "object") {
+    if (!node.parameters || typeof node.parameters !== 'object') {
       warnings.push(`Node "${node.name}" missing parameters object`);
     }
   }
@@ -89,10 +89,10 @@ export function validateWorkflow(
       }
 
       for (const connectionGroup of connections) {
-        if (!Array.isArray(connectionGroup)) continue;
+        if (!Array.isArray(connectionGroup)) {continue;}
 
         for (const connection of connectionGroup) {
-          if (!connection.node || typeof connection.node !== "string") {
+          if (!connection.node || typeof connection.node !== 'string') {
             errors.push(`Invalid connection from "${sourceName}"`);
             continue;
           }
@@ -110,14 +110,14 @@ export function validateWorkflow(
   // 5. Check for at least one trigger node
   const hasTrigger = workflow.nodes.some(
     (node) =>
-      node.type.toLowerCase().includes("trigger") ||
-      node.type.toLowerCase().includes("webhook") ||
-      node.name.toLowerCase().includes("start"),
+      node.type.toLowerCase().includes('trigger') ||
+      node.type.toLowerCase().includes('webhook') ||
+      node.name.toLowerCase().includes('start'),
   );
 
   if (!hasTrigger) {
     warnings.push(
-      "Workflow has no trigger node - it can only be executed manually",
+      'Workflow has no trigger node - it can only be executed manually',
     );
   }
 
@@ -135,9 +135,9 @@ export function validateWorkflow(
 
   for (const node of workflow.nodes) {
     const isTrigger =
-      node.type.toLowerCase().includes("trigger") ||
-      node.type.toLowerCase().includes("webhook") ||
-      node.name.toLowerCase().includes("start");
+      node.type.toLowerCase().includes('trigger') ||
+      node.type.toLowerCase().includes('webhook') ||
+      node.name.toLowerCase().includes('start');
 
     if (!isTrigger && !nodesWithIncoming.has(node.name)) {
       warnings.push(
@@ -209,7 +209,7 @@ export function validateWorkflowOrThrow(workflow: N8nWorkflow): N8nWorkflow {
 
   if (!result.valid) {
     throw new WorkflowValidationError(
-      `Workflow validation failed: ${result.errors.join(", ")}`,
+      `Workflow validation failed: ${result.errors.join(', ')}`,
       result.errors,
     );
   }

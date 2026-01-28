@@ -1,1 +1,1 @@
-export { N8nApiClient } from "./client.js";
+export { N8nApiClient } from './client.js';

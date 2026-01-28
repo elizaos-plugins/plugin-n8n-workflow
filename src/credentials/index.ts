@@ -1,1 +1,1 @@
-export { resolveCredentials } from "./resolver.js";
+export { resolveCredentials } from './resolver.js';

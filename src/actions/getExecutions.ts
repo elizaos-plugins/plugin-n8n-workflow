@@ -77,7 +77,10 @@ export const getExecutionsAction: Action = {
     );
 
     if (!service) {
-      logger.error("N8n Workflow service not available");
+      logger.error(
+        { src: "plugin:n8n-workflow:action:get-executions" },
+        "N8n Workflow service not available",
+      );
       if (callback) {
         await callback({
           text: "N8n Workflow service is not available.",
@@ -101,6 +104,7 @@ export const getExecutionsAction: Action = {
       const executions = await service.getWorkflowExecutions(workflowId, 10);
 
       logger.info(
+        { src: "plugin:n8n-workflow:action:get-executions" },
         `Retrieved ${executions.length} executions for workflow ${workflowId}`,
       );
 
@@ -137,7 +141,7 @@ export const getExecutionsAction: Action = {
           responseText += `   Error: ${execution.data.resultData.error.message}\n`;
         }
 
-        responseText += `\n`;
+        responseText += "\n";
       }
 
       if (callback) {
@@ -153,7 +157,10 @@ export const getExecutionsAction: Action = {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
-      logger.error(`Failed to get executions: ${errorMessage}`);
+      logger.error(
+        { src: "plugin:n8n-workflow:action:get-executions" },
+        `Failed to get executions: ${errorMessage}`,
+      );
 
       if (callback) {
         await callback({
