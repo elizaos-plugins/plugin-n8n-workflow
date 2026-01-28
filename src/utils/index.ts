@@ -1,16 +1,19 @@
-export { N8nApiClient } from "./n8nApiClient.js";
+// Re-exports for backwards compatibility
+// This file will be removed once all references are updated
+
+export { N8nApiClient } from "../api/index.js";
 export {
   searchNodes,
   getNodeByName,
   getNodesByCategory,
   getNodesByCredentialType,
   getCatalogStats,
-} from "./nodeCatalog.js";
-export { extractKeywords } from "./keywordExtractor.js";
-export { generateWorkflow } from "./workflowGenerator.js";
+} from "../catalog/index.js";
+export { extractKeywords } from "../generation/index.js";
+export { generateWorkflow } from "../generation/index.js";
 export {
   validateWorkflow,
   validateWorkflowOrThrow,
-} from "./workflowValidator.js";
-export { positionNodes } from "./nodePositioner.js";
-export { resolveCredentials } from "./credentialResolver.js";
+} from "../workflow/index.js";
+export { positionNodes } from "../workflow/index.js";
+export { resolveCredentials } from "../credentials/index.js";
