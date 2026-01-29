@@ -1,5 +1,5 @@
-import { NodeDefinition, NodeSearchResult } from '../types/index';
-import defaultNodesData from '../data/defaultNodes.json' assert { type: 'json' };
+import { NodeDefinition, NodeSearchResult } from "../types/index";
+import defaultNodesData from "../data/defaultNodes.json" assert { type: "json" };
 
 /**
  * n8n node catalog with keyword-based search
@@ -40,14 +40,16 @@ export function searchNodes(
   // Normalize keywords to lowercase
   const normalizedKeywords = keywords.map((kw) => kw.toLowerCase().trim());
 
-  // Score each node
-  const scoredNodes: NodeSearchResult[] = NODE_CATALOG.map((node) => {
+  // Score each node (skip entries with missing name/displayName)
+  const scoredNodes: NodeSearchResult[] = NODE_CATALOG.filter(
+    (node) => node.name && node.displayName,
+  ).map((node) => {
     let score = 0;
     const matchReasons: string[] = [];
 
     const nodeName = node.name.toLowerCase();
     const nodeDisplayName = node.displayName.toLowerCase();
-    const nodeDescription = node.description?.toLowerCase() || '';
+    const nodeDescription = node.description?.toLowerCase() || "";
 
     for (const keyword of normalizedKeywords) {
       // Exact name match (highest priority)
@@ -85,7 +87,7 @@ export function searchNodes(
     return {
       node,
       score,
-      matchReason: matchReasons.join(', ') || 'no strong match',
+      matchReason: matchReasons.join(", ") || "no strong match",
     };
   });
 

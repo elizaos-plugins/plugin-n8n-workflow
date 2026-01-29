@@ -6,15 +6,15 @@ export interface N8nWorkflow {
   connections: N8nConnections;
   active?: boolean;
   settings?: {
-    executionOrder?: 'v1' | 'v0';
+    executionOrder?: "v1" | "v0";
     saveExecutionProgress?: boolean;
     saveManualExecutions?: boolean;
-    saveDataErrorExecution?: 'all' | 'none';
-    saveDataSuccessExecution?: 'all' | 'none';
+    saveDataErrorExecution?: "all" | "none";
+    saveDataSuccessExecution?: "all" | "none";
     executionTimeout?: number;
     timezone?: string;
   };
-  tags?: string[];
+  tags?: N8nTag[];
   meta?: Record<string, unknown>;
   id?: string;
   createdAt?: string;
@@ -55,7 +55,7 @@ export interface N8nNode {
   retryOnFail?: boolean;
   maxTries?: number;
   waitBetweenTries?: number;
-  onError?: 'continueErrorOutput' | 'continueRegularOutput' | 'stopWorkflow';
+  onError?: "continueErrorOutput" | "continueRegularOutput" | "stopWorkflow";
 }
 
 export interface N8nCredentialReference {
@@ -89,12 +89,13 @@ export interface N8nCredential {
   name: string;
   type: string;
   data?: Record<string, unknown>;
+  isResolvable?: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface N8nCredentialSchema {
-  type: 'object';
+  type: "object";
   additionalProperties: boolean;
   properties: Record<
     string,
@@ -112,14 +113,33 @@ export interface N8nCredentialSchema {
 export interface N8nExecution {
   id: string;
   finished: boolean;
-  mode: 'manual' | 'trigger' | 'webhook' | 'retry';
-  retryOf?: string;
-  retrySuccessId?: string;
+  mode:
+    | "cli"
+    | "error"
+    | "integrated"
+    | "internal"
+    | "manual"
+    | "retry"
+    | "trigger"
+    | "webhook"
+    | "evaluation"
+    | "chat";
+  retryOf?: string | null;
+  retrySuccessId?: string | null;
   startedAt: string;
-  stoppedAt?: string;
+  stoppedAt?: string | null;
   workflowId: string;
-  workflowData?: N8nWorkflow;
-  status: 'running' | 'success' | 'error' | 'waiting' | 'canceled';
+  status:
+    | "canceled"
+    | "crashed"
+    | "error"
+    | "new"
+    | "running"
+    | "success"
+    | "unknown"
+    | "waiting";
+  waitTill?: string | null;
+  customData?: Record<string, unknown>;
   data?: {
     resultData?: {
       runData?: Record<string, unknown[]>;
@@ -214,7 +234,7 @@ export interface WorkflowGenerationContext {
  */
 export interface WorkflowMatchResult {
   matchedWorkflowId: string | null;
-  confidence: 'high' | 'medium' | 'low' | 'none';
+  confidence: "high" | "medium" | "low" | "none";
   matches: Array<{
     id: string;
     name: string;
@@ -293,18 +313,18 @@ export type OAuthService = {
  * Type guard to check if a service implements OAuthService interface
  */
 export function isOAuthService(service: unknown): service is OAuthService {
-  if (!service || typeof service !== 'object') {
+  if (!service || typeof service !== "object") {
     return false;
   }
 
   const s = service as Record<string, unknown>;
 
   return (
-    typeof s.getAuthUrl === 'function' &&
-    typeof s.hasConnection === 'function' &&
-    typeof s.getTokens === 'function' &&
-    typeof s.getN8nCredId === 'function' &&
-    typeof s.setN8nCredId === 'function'
+    typeof s.getAuthUrl === "function" &&
+    typeof s.hasConnection === "function" &&
+    typeof s.getTokens === "function" &&
+    typeof s.getN8nCredId === "function" &&
+    typeof s.setN8nCredId === "function"
   );
 }
 
@@ -342,7 +362,7 @@ export interface WorkflowIdParams {
 export interface GetExecutionsParams {
   workflowId: string;
   limit?: number;
-  status?: 'success' | 'error' | 'running' | 'waiting';
+  status?: "success" | "error" | "running" | "waiting";
 }
 
 export interface WorkflowCreationResult extends Record<string, unknown> {
@@ -378,7 +398,7 @@ export class N8nApiError extends Error {
     public response?: unknown,
   ) {
     super(message);
-    this.name = 'N8nApiError';
+    this.name = "N8nApiError";
   }
 }
 
@@ -388,7 +408,7 @@ export class WorkflowValidationError extends Error {
     public errors: string[],
   ) {
     super(message);
-    this.name = 'WorkflowValidationError';
+    this.name = "WorkflowValidationError";
   }
 }
 
@@ -398,6 +418,6 @@ export class CredentialResolutionError extends Error {
     public missingConnections: MissingConnection[],
   ) {
     super(message);
-    this.name = 'CredentialResolutionError';
+    this.name = "CredentialResolutionError";
   }
 }
