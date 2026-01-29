@@ -73,7 +73,6 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@n8n/rest-api-client": "^2.6.0",
-    "drizzle-orm": "^0.44.2"
+    "drizzle-orm": "^0.45.1"
   }
 }
