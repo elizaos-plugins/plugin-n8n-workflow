@@ -1,5 +1,6 @@
 import { type IAgentRuntime, logger, type Plugin } from '@elizaos/core';
-import { N8nWorkflowService } from './services/index';
+import { N8nWorkflowService, N8nCredentialStore } from './services/index';
+import * as dbSchema from './db/index';
 import {
   createWorkflowAction,
   listWorkflowsAction,
@@ -8,7 +9,6 @@ import {
   deactivateWorkflowAction,
   deleteWorkflowAction,
   executeWorkflowAction,
-  listCredentialsAction,
 } from './actions/index';
 import { workflowStatusProvider, activeWorkflowsProvider } from './providers/index';
 
@@ -50,7 +50,9 @@ export const n8nWorkflowPlugin: Plugin = {
     'Supports 450+ native n8n nodes (Gmail, Slack, Stripe, etc.) with intelligent ' +
     'credential resolution and workflow management.',
 
-  services: [N8nWorkflowService],
+  services: [N8nWorkflowService, N8nCredentialStore],
+
+  schema: dbSchema,
 
   actions: [
     createWorkflowAction,
@@ -60,7 +62,6 @@ export const n8nWorkflowPlugin: Plugin = {
     deactivateWorkflowAction,
     deleteWorkflowAction,
     executeWorkflowAction,
-    listCredentialsAction,
   ],
 
   providers: [workflowStatusProvider, activeWorkflowsProvider],
