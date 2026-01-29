@@ -56,7 +56,9 @@ function formatPreview(workflow: N8nWorkflow): string {
 
     while (queue.length > 0) {
       const current = queue.shift()!;
-      if (visited.has(current)) continue;
+      if (visited.has(current)) {
+        continue;
+      }
       visited.add(current);
       flowParts.push(current);
 

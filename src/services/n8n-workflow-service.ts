@@ -120,7 +120,7 @@ export class N8nWorkflowService extends Service {
   async generateWorkflowDraft(prompt: string): Promise<N8nWorkflow> {
     logger.info(
       { src: 'plugin:n8n-workflow:service:main' },
-      `Generating workflow draft from prompt`
+      'Generating workflow draft from prompt'
     );
 
     const keywords = await extractKeywords(this.runtime, prompt);
