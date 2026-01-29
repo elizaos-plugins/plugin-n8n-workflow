@@ -4,7 +4,12 @@ import { searchNodes } from '../utils/catalog';
 import { extractKeywords, generateWorkflow } from '../utils/generation';
 import { positionNodes, validateWorkflow } from '../utils/workflow';
 import { resolveCredentials, getMissingCredentials } from '../utils/credentialResolver';
-import type { N8nWorkflowResponse, N8nExecution, WorkflowCreationResult } from '../types/index';
+import type {
+  N8nWorkflow,
+  N8nWorkflowResponse,
+  N8nExecution,
+  WorkflowCreationResult,
+} from '../types/index';
 
 export const N8N_WORKFLOW_SERVICE_TYPE = 'n8n_workflow';
 
@@ -18,16 +23,10 @@ export interface N8nWorkflowServiceConfig {
 }
 
 /**
- * N8n Workflow Service - Orchestrates the RAG pipeline for workflow generation
+ * N8n Workflow Service - Orchestrates the RAG pipeline for workflow generation.
  *
- * Pipeline:
- * 1. Extract keywords from user prompt (LLM - OBJECT_SMALL)
- * 2. Search node catalog for relevant nodes (local search)
- * 3. Generate workflow JSON (LLM - TEXT_LARGE)
- * 4. Validate workflow structure
- * 5. Position nodes on canvas
- * 6. Resolve credentials (cloud/local/placeholder)
- * 7. Deploy to n8n Cloud via REST API
+ * generateWorkflowDraft(): keywords → node search → LLM generation → validation → positioning
+ * deployWorkflow(): credential resolution → n8n Cloud API → tagging
  */
 export class N8nWorkflowService extends Service {
   static override readonly serviceType = N8N_WORKFLOW_SERVICE_TYPE;
@@ -115,143 +114,117 @@ export class N8nWorkflowService extends Service {
   }
 
   /**
-   * Main RAG pipeline: Create workflow from natural language prompt
-   *
-   * @param prompt - User's natural language request
-   * @param userId - User ID for tagging and credential resolution
-   * @returns Workflow creation result with ID and metadata
+   * Generate a workflow draft from natural language.
+   * Does NOT resolve credentials or deploy — returns a preview-ready workflow.
    */
-  async createWorkflowFromPrompt(prompt: string, userId?: string): Promise<WorkflowCreationResult> {
+  async generateWorkflowDraft(prompt: string): Promise<N8nWorkflow> {
     logger.info(
       { src: 'plugin:n8n-workflow:service:main' },
-      `Creating workflow from prompt for user ${userId || 'unknown'}`
+      `Generating workflow draft from prompt`
     );
 
-    try {
-      // Step 1: Extract keywords (LLM - OBJECT_SMALL)
-      logger.debug({ src: 'plugin:n8n-workflow:service:main' }, 'Step 1: Extracting keywords...');
-      const keywords = await extractKeywords(this.runtime, prompt);
-      logger.debug(
-        { src: 'plugin:n8n-workflow:service:main' },
-        `Extracted keywords: ${keywords.join(', ')}`
+    const keywords = await extractKeywords(this.runtime, prompt);
+    logger.debug(
+      { src: 'plugin:n8n-workflow:service:main' },
+      `Extracted keywords: ${keywords.join(', ')}`
+    );
+
+    const relevantNodes = searchNodes(keywords, 15);
+    logger.debug(
+      { src: 'plugin:n8n-workflow:service:main' },
+      `Found ${relevantNodes.length} relevant nodes`
+    );
+
+    if (relevantNodes.length === 0) {
+      throw new Error(
+        'No relevant n8n nodes found for the given prompt. Please be more specific about the integrations you want to use (e.g., Gmail, Slack, Stripe).'
       );
+    }
 
-      // Step 2: Search node catalog (local)
-      logger.debug(
-        { src: 'plugin:n8n-workflow:service:main' },
-        'Step 2: Searching node catalog...'
-      );
-      const relevantNodes = searchNodes(keywords, 15);
-      logger.debug(
-        { src: 'plugin:n8n-workflow:service:main' },
-        `Found ${relevantNodes.length} relevant nodes`
-      );
+    const workflow = await generateWorkflow(
+      this.runtime,
+      prompt,
+      relevantNodes.map((r) => r.node)
+    );
+    logger.debug(
+      { src: 'plugin:n8n-workflow:service:main' },
+      `Generated workflow with ${workflow.nodes?.length || 0} nodes`
+    );
 
-      if (relevantNodes.length === 0) {
-        throw new Error(
-          'No relevant n8n nodes found for the given prompt. Please be more specific about the integrations you want to use (e.g., Gmail, Slack, Stripe).'
-        );
-      }
-
-      // Step 3: Generate workflow JSON (LLM - TEXT_LARGE)
-      logger.debug(
-        { src: 'plugin:n8n-workflow:service:main' },
-        'Step 3: Generating workflow JSON...'
-      );
-      const workflow = await generateWorkflow(
-        this.runtime,
-        prompt,
-        relevantNodes.map((r) => r.node)
-      );
-      logger.debug(
-        { src: 'plugin:n8n-workflow:service:main' },
-        `Generated workflow with ${workflow.nodes?.length || 0} nodes`
-      );
-
-      // Step 4: Validate workflow structure
-      logger.debug({ src: 'plugin:n8n-workflow:service:main' }, 'Step 4: Validating workflow...');
-      const validationResult = validateWorkflow(workflow);
-      if (!validationResult.valid) {
-        logger.error(
-          { src: 'plugin:n8n-workflow:service:main' },
-          `Validation errors: ${validationResult.errors.join(', ')}`
-        );
-        throw new Error(`Generated workflow is invalid: ${validationResult.errors[0]}`);
-      }
-      if (validationResult.warnings.length > 0) {
-        logger.warn(
-          { src: 'plugin:n8n-workflow:service:main' },
-          `Validation warnings: ${validationResult.warnings.join(', ')}`
-        );
-      }
-
-      // Step 5: Position nodes on canvas
-      logger.debug({ src: 'plugin:n8n-workflow:service:main' }, 'Step 5: Positioning nodes...');
-      const positionedWorkflow = positionNodes(workflow);
-
-      // Step 6: Resolve credentials
-      logger.debug({ src: 'plugin:n8n-workflow:service:main' }, 'Step 6: Resolving credentials...');
-      const config = this.getConfig();
-      const client = this.getClient();
-      const credentialResult = await resolveCredentials(
-        positionedWorkflow,
-        userId || '',
-        this.runtime,
-        client,
-        config
-      );
-
-      // Step 7: Deploy to n8n Cloud
-      logger.debug(
-        { src: 'plugin:n8n-workflow:service:main' },
-        'Step 7: Deploying to n8n Cloud...'
-      );
-      const createdWorkflow = await client.createWorkflow(credentialResult.workflow);
-
-      // Tag workflow with user ID if provided
-      if (userId) {
-        try {
-          // Check if tag exists, create if not
-          const tagsResponse = await client.listTags();
-          let userTag = tagsResponse.data.find((t) => t.name === `user:${userId}`);
-
-          if (!userTag) {
-            userTag = await client.createTag(`user:${userId}`);
-          }
-
-          // Assign tag to workflow
-          await client.updateWorkflowTags(createdWorkflow.id, [userTag.id]);
-          logger.debug(
-            { src: 'plugin:n8n-workflow:service:main' },
-            `Tagged workflow ${createdWorkflow.id} with user:${userId}`
-          );
-        } catch (error) {
-          logger.warn(
-            { src: 'plugin:n8n-workflow:service:main' },
-            `Failed to tag workflow: ${error instanceof Error ? error.message : String(error)}`
-          );
-        }
-      }
-
-      logger.info(
-        { src: 'plugin:n8n-workflow:service:main' },
-        `Workflow created successfully: ${createdWorkflow.id}`
-      );
-
-      return {
-        id: createdWorkflow.id,
-        name: createdWorkflow.name,
-        active: createdWorkflow.active ?? false,
-        nodeCount: createdWorkflow.nodes?.length || 0,
-        missingCredentials: getMissingCredentials(credentialResult.workflow),
-      };
-    } catch (error) {
+    const validationResult = validateWorkflow(workflow);
+    if (!validationResult.valid) {
       logger.error(
         { src: 'plugin:n8n-workflow:service:main' },
-        `Failed to create workflow: ${error instanceof Error ? error.message : String(error)}`
+        `Validation errors: ${validationResult.errors.join(', ')}`
       );
-      throw error;
+      throw new Error(`Generated workflow is invalid: ${validationResult.errors[0]}`);
     }
+    if (validationResult.warnings.length > 0) {
+      logger.warn(
+        { src: 'plugin:n8n-workflow:service:main' },
+        `Validation warnings: ${validationResult.warnings.join(', ')}`
+      );
+    }
+
+    return positionNodes(workflow);
+  }
+
+  /**
+   * Deploy a previously generated workflow.
+   * Resolves credentials and creates the workflow via n8n API.
+   */
+  async deployWorkflow(workflow: N8nWorkflow, userId?: string): Promise<WorkflowCreationResult> {
+    logger.info(
+      { src: 'plugin:n8n-workflow:service:main' },
+      `Deploying workflow "${workflow.name}" for user ${userId || 'unknown'}`
+    );
+
+    const config = this.getConfig();
+    const client = this.getClient();
+    const credentialResult = await resolveCredentials(
+      workflow,
+      userId || '',
+      this.runtime,
+      client,
+      config
+    );
+
+    const createdWorkflow = await client.createWorkflow(credentialResult.workflow);
+
+    if (userId) {
+      try {
+        const tagsResponse = await client.listTags();
+        let userTag = tagsResponse.data.find((t) => t.name === `user:${userId}`);
+
+        if (!userTag) {
+          userTag = await client.createTag(`user:${userId}`);
+        }
+
+        await client.updateWorkflowTags(createdWorkflow.id, [userTag.id]);
+        logger.debug(
+          { src: 'plugin:n8n-workflow:service:main' },
+          `Tagged workflow ${createdWorkflow.id} with user:${userId}`
+        );
+      } catch (error) {
+        logger.warn(
+          { src: 'plugin:n8n-workflow:service:main' },
+          `Failed to tag workflow: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+
+    logger.info(
+      { src: 'plugin:n8n-workflow:service:main' },
+      `Workflow created successfully: ${createdWorkflow.id}`
+    );
+
+    return {
+      id: createdWorkflow.id,
+      name: createdWorkflow.name,
+      active: createdWorkflow.active ?? false,
+      nodeCount: createdWorkflow.nodes?.length || 0,
+      missingCredentials: getMissingCredentials(credentialResult.workflow),
+    };
   }
 
   /**
@@ -303,19 +276,6 @@ export class N8nWorkflowService extends Service {
     const client = this.getClient();
     await client.deleteWorkflow(workflowId);
     logger.info({ src: 'plugin:n8n-workflow:service:main' }, `Workflow ${workflowId} deleted`);
-  }
-
-  /**
-   * Execute a workflow manually
-   */
-  async executeWorkflow(workflowId: string): Promise<N8nExecution> {
-    const client = this.getClient();
-    const execution = await client.executeWorkflow(workflowId);
-    logger.info(
-      { src: 'plugin:n8n-workflow:service:main' },
-      `Workflow ${workflowId} executed - execution ID: ${execution.id}`
-    );
-    return execution;
   }
 
   /**

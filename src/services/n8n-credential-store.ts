@@ -1,5 +1,6 @@
 import { type IAgentRuntime, logger, Service } from '@elizaos/core';
 import { eq, and, sql } from 'drizzle-orm';
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { credentialMappings } from '../db/schema';
 import { N8N_CREDENTIAL_STORE_TYPE } from '../types/index';
 import type { N8nCredentialStoreApi } from '../types/index';
@@ -17,12 +18,12 @@ export class N8nCredentialStore extends Service implements N8nCredentialStoreApi
   override capabilityDescription =
     'Stores n8n credential ID mappings per user and credential type, backed by PostgreSQL.';
 
-  private getDb() {
-    const db = (this.runtime as any).db;
+  private getDb(): NodePgDatabase {
+    const db = this.runtime.db;
     if (!db) {
       throw new Error('Database not available for N8nCredentialStore');
     }
-    return db;
+    return db as NodePgDatabase;
   }
 
   static async start(runtime: IAgentRuntime): Promise<N8nCredentialStore> {

@@ -75,5 +75,3 @@ export const activeWorkflowsProvider: Provider = {
     }
   },
 };
-
-export default activeWorkflowsProvider;

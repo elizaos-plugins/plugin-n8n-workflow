@@ -1,4 +1,4 @@
-import { N8nWorkflow, WorkflowValidationResult, WorkflowValidationError } from '../types/index';
+import type { N8nWorkflow, WorkflowValidationResult } from '../types/index';
 
 /**
  * Validate workflow structure and auto-fix common issues
@@ -176,24 +176,6 @@ function autoFixWorkflow(workflow: N8nWorkflow): N8nWorkflow {
   }
 
   return fixed;
-}
-
-/**
- * Validate and throw if workflow is invalid
- * Convenience function for when you want to fail fast
- */
-export function validateWorkflowOrThrow(workflow: N8nWorkflow): N8nWorkflow {
-  const result = validateWorkflow(workflow);
-
-  if (!result.valid) {
-    throw new WorkflowValidationError(
-      `Workflow validation failed: ${result.errors.join(', ')}`,
-      result.errors
-    );
-  }
-
-  // Return fixed workflow if available, otherwise original
-  return result.fixedWorkflow || workflow;
 }
 
 /**

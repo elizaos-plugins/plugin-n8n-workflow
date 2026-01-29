@@ -82,5 +82,3 @@ export const workflowStatusProvider: Provider = {
     }
   },
 };
-
-export default workflowStatusProvider;

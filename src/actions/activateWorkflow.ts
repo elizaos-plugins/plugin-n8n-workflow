@@ -154,5 +154,3 @@ export const activateWorkflowAction: Action = {
 
   examples,
 };
-
-export default activateWorkflowAction;

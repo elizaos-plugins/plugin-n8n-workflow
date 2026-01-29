@@ -159,5 +159,3 @@ export const deactivateWorkflowAction: Action = {
 
   examples,
 };
-
-export default deactivateWorkflowAction;

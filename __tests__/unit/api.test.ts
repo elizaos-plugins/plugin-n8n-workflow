@@ -78,7 +78,7 @@ describe('N8nApiClient constructor', () => {
 describe('N8nApiClient workflows', () => {
   const client = new N8nApiClient('https://n8n.test', 'key-123');
 
-  test('createWorkflow sends POST /workflows with body', async () => {
+  test('createWorkflow sends POST /workflows with sanitized body', async () => {
     const workflow = createValidWorkflow();
     const responseData = createWorkflowResponse({ id: 'wf-new' });
     mockFetch = mock(() => Promise.resolve(mockResponse(200, responseData)));
@@ -89,7 +89,17 @@ describe('N8nApiClient workflows', () => {
     const { url, options } = getLastFetchCall();
     expect(url).toBe('https://n8n.test/api/v1/workflows');
     expect(options.method).toBe('POST');
-    expect(JSON.parse(options.body as string)).toEqual(workflow);
+    const body = JSON.parse(options.body as string);
+    expect(body.name).toBe(workflow.name);
+    expect(body.nodes).toHaveLength(workflow.nodes.length);
+    expect(body.connections).toBeDefined();
+    expect(body.settings).toBeDefined();
+    // readOnly/internal fields must not be sent
+    expect(body._meta).toBeUndefined();
+    expect(body.active).toBeUndefined();
+    expect(body.id).toBeUndefined();
+    expect(body.createdAt).toBeUndefined();
+    expect(body.updatedAt).toBeUndefined();
     expect(result.id).toBe('wf-new');
   });
 
@@ -140,16 +150,20 @@ describe('N8nApiClient workflows', () => {
     expect(result.id).toBe('wf-42');
   });
 
-  test('updateWorkflow sends PUT /workflows/{id}', async () => {
+  test('updateWorkflow sends PUT /workflows/{id} with sanitized body', async () => {
     const wf = createWorkflowResponse({ id: 'wf-42', name: 'Updated' });
     mockFetch = mock(() => Promise.resolve(mockResponse(200, wf)));
     globalThis.fetch = mockFetch as any;
 
-    const result = await client.updateWorkflow('wf-42', { name: 'Updated' });
+    const workflow = createValidWorkflow({ name: 'Updated' });
+    const result = await client.updateWorkflow('wf-42', workflow);
 
     const { url, options } = getLastFetchCall();
     expect(url).toBe('https://n8n.test/api/v1/workflows/wf-42');
     expect(options.method).toBe('PUT');
+    const body = JSON.parse(options.body as string);
+    expect(body.name).toBe('Updated');
+    expect(body.settings).toBeDefined();
     expect(result.name).toBe('Updated');
   });
 
@@ -189,22 +203,9 @@ describe('N8nApiClient workflows', () => {
     expect(result.active).toBe(false);
   });
 
-  test('executeWorkflow sends POST /workflows/{id}/execute', async () => {
-    const exec = createExecution({ id: 'exec-99' });
-    mockFetch = mock(() => Promise.resolve(mockResponse(200, exec)));
-    globalThis.fetch = mockFetch as any;
-
-    const result = await client.executeWorkflow('wf-42');
-
-    const { url, options } = getLastFetchCall();
-    expect(url).toBe('https://n8n.test/api/v1/workflows/wf-42/execute');
-    expect(options.method).toBe('POST');
-    expect(result.id).toBe('exec-99');
-  });
-
-  test('updateWorkflowTags sends PUT /workflows/{id}/tags', async () => {
-    const wf = createWorkflowResponse();
-    mockFetch = mock(() => Promise.resolve(mockResponse(200, wf)));
+  test('updateWorkflowTags sends PUT /workflows/{id}/tags with [{id}] array', async () => {
+    const tags = [createTag({ id: 'tag-1' }), createTag({ id: 'tag-2' })];
+    mockFetch = mock(() => Promise.resolve(mockResponse(200, tags)));
     globalThis.fetch = mockFetch as any;
 
     await client.updateWorkflowTags('wf-42', ['tag-1', 'tag-2']);
@@ -212,9 +213,7 @@ describe('N8nApiClient workflows', () => {
     const { url, options } = getLastFetchCall();
     expect(url).toBe('https://n8n.test/api/v1/workflows/wf-42/tags');
     expect(options.method).toBe('PUT');
-    expect(JSON.parse(options.body as string)).toEqual({
-      tags: ['tag-1', 'tag-2'],
-    });
+    expect(JSON.parse(options.body as string)).toEqual([{ id: 'tag-1' }, { id: 'tag-2' }]);
   });
 });
 
@@ -521,5 +520,6 @@ describe('N8nApiClient request format', () => {
     const parsed = JSON.parse(options.body as string);
     expect(parsed.name).toBe(workflow.name);
     expect(parsed.nodes).toHaveLength(workflow.nodes.length);
+    expect(parsed.settings).toBeDefined();
   });
 });

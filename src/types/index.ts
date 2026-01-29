@@ -214,13 +214,6 @@ export interface KeywordExtractionResult {
   keywords: string[];
 }
 
-export interface WorkflowGenerationContext {
-  prompt: string;
-  keywords: string[];
-  relevantNodes: NodeDefinition[];
-  userId?: string;
-}
-
 /**
  * Result of semantic workflow matching
  */
@@ -320,20 +313,19 @@ export interface N8nPluginConfig {
   credentials?: Record<string, string>; // credType -> n8nCredId (for local pre-configured mode)
 }
 
-// Action parameter types
+// Draft/preview/confirm types
 
-export interface CreateWorkflowParams {
+export interface WorkflowDraft {
+  workflow: N8nWorkflow;
   prompt: string;
+  userId: string;
+  createdAt: number;
 }
 
-export interface WorkflowIdParams {
-  workflowId: string;
-}
-
-export interface GetExecutionsParams {
-  workflowId: string;
-  limit?: number;
-  status?: 'success' | 'error' | 'running' | 'waiting';
+export interface DraftIntentResult {
+  intent: 'confirm' | 'cancel' | 'modify' | 'new';
+  modificationRequest?: string;
+  reason: string;
 }
 
 export interface WorkflowCreationResult extends Record<string, unknown> {
@@ -342,22 +334,6 @@ export interface WorkflowCreationResult extends Record<string, unknown> {
   active: boolean;
   nodeCount: number;
   missingCredentials: string[];
-}
-
-// Provider types
-
-export interface WorkflowStatusInfo {
-  id: string;
-  name: string;
-  active: boolean;
-  lastExecution?: {
-    id: string;
-    status: string;
-    startedAt: string;
-    finishedAt?: string;
-    error?: string;
-  };
-  tags: string[];
 }
 
 // Error types
@@ -380,15 +356,5 @@ export class WorkflowValidationError extends Error {
   ) {
     super(message);
     this.name = 'WorkflowValidationError';
-  }
-}
-
-export class CredentialResolutionError extends Error {
-  constructor(
-    message: string,
-    public missingConnections: MissingConnection[]
-  ) {
-    super(message);
-    this.name = 'CredentialResolutionError';
   }
 }

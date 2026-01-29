@@ -150,5 +150,3 @@ export const getExecutionsAction: Action = {
 
   examples,
 };
-
-export default getExecutionsAction;

@@ -1,7 +1,13 @@
 import { describe, test, expect, mock } from 'bun:test';
-import { extractKeywords, matchWorkflow, generateWorkflow } from '../../src/utils/generation';
+import {
+  extractKeywords,
+  matchWorkflow,
+  generateWorkflow,
+  classifyDraftIntent,
+} from '../../src/utils/generation';
 import { createMockRuntime } from '../helpers/mockRuntime';
 import type { ModelType } from '@elizaos/core';
+import type { WorkflowDraft } from '../../src/types/index';
 
 // ============================================================================
 // extractKeywords
@@ -264,5 +270,122 @@ describe('generateWorkflow', () => {
     const params = callArgs[1] as { prompt: string };
     expect(params.prompt).toContain('Gmail');
     expect(params.prompt).toContain('Send email');
+  });
+});
+
+// ============================================================================
+// classifyDraftIntent
+// ============================================================================
+
+describe('classifyDraftIntent', () => {
+  const sampleDraft: WorkflowDraft = {
+    workflow: {
+      name: 'Stripe Gmail Summary',
+      nodes: [
+        {
+          name: 'Schedule Trigger',
+          type: 'n8n-nodes-base.scheduleTrigger',
+          typeVersion: 1,
+          position: [0, 0],
+          parameters: {},
+        },
+        {
+          name: 'Gmail',
+          type: 'n8n-nodes-base.gmail',
+          typeVersion: 2,
+          position: [200, 0],
+          parameters: { operation: 'send' },
+        },
+      ],
+      connections: {
+        'Schedule Trigger': {
+          main: [[{ node: 'Gmail', type: 'main', index: 0 }]],
+        },
+      },
+    },
+    prompt: 'Send Stripe summaries via Gmail',
+    userId: 'user-001',
+    createdAt: Date.now(),
+  };
+
+  test('returns confirm intent from LLM', async () => {
+    const useModel = mock(() =>
+      Promise.resolve({
+        intent: 'confirm',
+        reason: 'User said yes',
+      })
+    );
+    const runtime = createMockRuntime({ useModel });
+
+    const result = await classifyDraftIntent(runtime, 'Yes, deploy it', sampleDraft);
+
+    expect(result.intent).toBe('confirm');
+    expect(result.reason).toBe('User said yes');
+  });
+
+  test('returns modify intent with modification request', async () => {
+    const useModel = mock(() =>
+      Promise.resolve({
+        intent: 'modify',
+        modificationRequest: 'Use Outlook instead',
+        reason: 'User wants different email',
+      })
+    );
+    const runtime = createMockRuntime({ useModel });
+
+    const result = await classifyDraftIntent(runtime, 'Use Outlook instead', sampleDraft);
+
+    expect(result.intent).toBe('modify');
+    expect(result.modificationRequest).toBe('Use Outlook instead');
+  });
+
+  test('includes draft summary in prompt sent to LLM', async () => {
+    const useModel = mock(() =>
+      Promise.resolve({
+        intent: 'confirm',
+        reason: 'test',
+      })
+    );
+    const runtime = createMockRuntime({ useModel });
+
+    await classifyDraftIntent(runtime, 'yes', sampleDraft);
+
+    const callArgs = useModel.mock.calls[0] as any[];
+    const params = callArgs[1] as { prompt: string };
+    expect(params.prompt).toContain('Stripe Gmail Summary');
+    expect(params.prompt).toContain('Schedule Trigger');
+    expect(params.prompt).toContain('Send Stripe summaries via Gmail');
+  });
+
+  test('returns cancel intent', async () => {
+    const useModel = mock(() =>
+      Promise.resolve({
+        intent: 'cancel',
+        reason: 'User rejected',
+      })
+    );
+    const runtime = createMockRuntime({ useModel });
+
+    const result = await classifyDraftIntent(runtime, 'No, forget it', sampleDraft);
+
+    expect(result.intent).toBe('cancel');
+  });
+
+  test('returns new intent for unrelated request', async () => {
+    const useModel = mock(() =>
+      Promise.resolve({
+        intent: 'new',
+        reason: 'Completely different request',
+      })
+    );
+    const runtime = createMockRuntime({ useModel });
+
+    const result = await classifyDraftIntent(
+      runtime,
+      'Create a Slack to Jira integration',
+      sampleDraft
+    );
+
+    expect(result.intent).toBe('new');
   });
 });

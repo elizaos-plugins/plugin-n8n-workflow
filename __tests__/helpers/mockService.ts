@@ -1,18 +1,52 @@
 import { mock } from 'bun:test';
 import type { N8nWorkflowService } from '../../src/services/n8n-workflow-service';
-import { createWorkflowResponse, createExecution, createCredential } from '../fixtures/workflows';
+import { createWorkflowResponse, createExecution } from '../fixtures/workflows';
 
 export function createMockService(
   overrides?: Partial<Record<keyof N8nWorkflowService, unknown>>
 ): N8nWorkflowService {
   return {
     serviceType: 'n8n_workflow',
-    createWorkflowFromPrompt: mock(() =>
+    generateWorkflowDraft: mock(() =>
+      Promise.resolve({
+        name: 'Generated Workflow',
+        nodes: [
+          {
+            name: 'Schedule Trigger',
+            type: 'n8n-nodes-base.scheduleTrigger',
+            typeVersion: 1,
+            position: [0, 0],
+            parameters: {},
+          },
+          {
+            name: 'Gmail',
+            type: 'n8n-nodes-base.gmail',
+            typeVersion: 2,
+            position: [200, 0],
+            parameters: { operation: 'send' },
+            credentials: {
+              gmailOAuth2Api: { id: '{{CREDENTIAL_ID}}', name: 'Gmail Account' },
+            },
+          },
+        ],
+        connections: {
+          'Schedule Trigger': {
+            main: [[{ node: 'Gmail', type: 'main', index: 0 }]],
+          },
+        },
+        _meta: {
+          assumptions: ['Using Gmail as email service'],
+          suggestions: [],
+          requiresClarification: [],
+        },
+      })
+    ),
+    deployWorkflow: mock(() =>
       Promise.resolve({
         id: 'wf-001',
         name: 'Generated Workflow',
         active: false,
-        nodeCount: 3,
+        nodeCount: 2,
         missingCredentials: [],
       })
     ),
@@ -33,7 +67,6 @@ export function createMockService(
     activateWorkflow: mock(() => Promise.resolve()),
     deactivateWorkflow: mock(() => Promise.resolve()),
     deleteWorkflow: mock(() => Promise.resolve()),
-    executeWorkflow: mock(() => Promise.resolve(createExecution())),
     getWorkflowExecutions: mock(() =>
       Promise.resolve([
         createExecution({ id: 'exec-001', status: 'success' }),

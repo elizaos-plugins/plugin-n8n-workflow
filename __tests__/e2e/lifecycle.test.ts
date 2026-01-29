@@ -11,57 +11,56 @@
  * - Real N8nApiClient (with mock fetch)
  */
 
-import { describe, test, expect, afterEach, mock } from "bun:test";
-import type { State } from "@elizaos/core";
-import { activateWorkflowAction } from "../../src/actions/activateWorkflow";
-import { deactivateWorkflowAction } from "../../src/actions/deactivateWorkflow";
-import { deleteWorkflowAction } from "../../src/actions/deleteWorkflow";
-import { executeWorkflowAction } from "../../src/actions/executeWorkflow";
-import { listWorkflowsAction } from "../../src/actions/listWorkflows";
-import { getExecutionsAction } from "../../src/actions/getExecutions";
-import { activeWorkflowsProvider } from "../../src/providers/activeWorkflows";
-import { createE2ERuntime, jsonResponse } from "../helpers/testRuntime";
+import { describe, test, expect, afterEach, mock } from 'bun:test';
+import type { State } from '@elizaos/core';
+import { activateWorkflowAction } from '../../src/actions/activateWorkflow';
+import { deactivateWorkflowAction } from '../../src/actions/deactivateWorkflow';
+import { deleteWorkflowAction } from '../../src/actions/deleteWorkflow';
+import { listWorkflowsAction } from '../../src/actions/listWorkflows';
+import { getExecutionsAction } from '../../src/actions/getExecutions';
+import { activeWorkflowsProvider } from '../../src/providers/activeWorkflows';
+import { createE2ERuntime, jsonResponse } from '../helpers/testRuntime';
 import {
   createWorkflowResponse,
   createExecution,
   createTag,
   createMatchResult,
   createNoMatchResult,
-} from "../fixtures/workflows";
+} from '../fixtures/workflows';
 
-const USER_TAG = createTag({ id: "tag-user", name: "user:user-e2e" });
+const USER_TAG = createTag({ id: 'tag-user', name: 'user:user-e2e' });
 
 // ============================================================================
 // ACTIVATE — Full chain
 // ============================================================================
 
-describe("E2E: ACTIVATE workflow", () => {
+describe('E2E: ACTIVATE workflow', () => {
   let cleanup: () => void;
 
   afterEach(() => cleanup?.());
 
-  test("full chain: handler → matchWorkflow → service → API → fetch", async () => {
+  test('full chain: handler → matchWorkflow → service → API → fetch', async () => {
     const activatedWf = createWorkflowResponse({
-      id: "wf-001",
-      name: "Stripe Payments",
+      id: 'wf-001',
+      name: 'Stripe Payments',
       active: true,
     });
 
     const ctx = createE2ERuntime({
       fetchResponses: new Map([
-        ["/workflows/wf-001/activate", () => jsonResponse(200, activatedWf)],
+        ['/workflows/wf-001/activate', () => jsonResponse(200, activatedWf)],
       ]),
       useModelResponse: mock(() =>
         Promise.resolve(
           createMatchResult({
-            matchedWorkflowId: "wf-001",
-            confidence: "high",
-          }),
-        ),
+            matchedWorkflowId: 'wf-001',
+            confidence: 'high',
+          })
+        )
       ),
       workflows: [
-        { id: "wf-001", name: "Stripe Payments", active: false },
-        { id: "wf-002", name: "Gmail Notifications", active: true },
+        { id: 'wf-001', name: 'Stripe Payments', active: false },
+        { id: 'wf-002', name: 'Gmail Notifications', active: true },
       ],
     });
     cleanup = ctx.cleanup;
@@ -69,22 +68,20 @@ describe("E2E: ACTIVATE workflow", () => {
     const callback = ctx.createCallback();
     const result = await activateWorkflowAction.handler(
       ctx.runtime,
-      ctx.createMessage("Activate the Stripe workflow"),
+      ctx.createMessage('Activate the Stripe workflow'),
       ctx.state,
       {},
-      callback,
+      callback
     );
 
     // Verify result
-    expect(result.success).toBe(true);
+    expect(result?.success).toBe(true);
 
     // Verify fetch was called with correct URL
     const fetchCalls = ctx.fetchMock.mock.calls as [string, RequestInit][];
-    const activateCall = fetchCalls.find(([url]) =>
-      url.includes("/workflows/wf-001/activate"),
-    );
+    const activateCall = fetchCalls.find(([url]) => url.includes('/workflows/wf-001/activate'));
     expect(activateCall).toBeDefined();
-    expect(activateCall![1].method).toBe("POST");
+    expect(activateCall![1].method).toBe('POST');
 
     // Verify LLM was called for matching
     expect(ctx.runtime.useModel).toHaveBeenCalled();
@@ -93,53 +90,53 @@ describe("E2E: ACTIVATE workflow", () => {
     expect(callback).toHaveBeenCalled();
   });
 
-  test("full chain: no match returns failure without calling API", async () => {
+  test('full chain: no match returns failure without calling API', async () => {
     const ctx = createE2ERuntime({
       useModelResponse: mock(() => Promise.resolve(createNoMatchResult())),
-      workflows: [{ id: "wf-001", name: "Stripe Payments", active: false }],
+      workflows: [{ id: 'wf-001', name: 'Stripe Payments', active: false }],
     });
     cleanup = ctx.cleanup;
 
     const callback = ctx.createCallback();
     const result = await activateWorkflowAction.handler(
       ctx.runtime,
-      ctx.createMessage("Activate the nonexistent workflow"),
+      ctx.createMessage('Activate the nonexistent workflow'),
       ctx.state,
       {},
-      callback,
+      callback
     );
 
-    expect(result.success).toBe(false);
+    expect(result?.success).toBe(false);
 
     // Verify fetch was NOT called (no API hit)
     expect(ctx.fetchMock).not.toHaveBeenCalled();
   });
 
-  test("full chain: API error propagates through entire chain", async () => {
+  test('full chain: API error propagates through entire chain', async () => {
     const ctx = createE2ERuntime({
       fetchResponses: new Map([
         [
-          "/workflows/wf-001/activate",
-          () => jsonResponse(403, { message: "Insufficient permissions" }),
+          '/workflows/wf-001/activate',
+          () => jsonResponse(403, { message: 'Insufficient permissions' }),
         ],
       ]),
       useModelResponse: mock(() => Promise.resolve(createMatchResult())),
-      workflows: [{ id: "wf-001", name: "Stripe Payments", active: false }],
+      workflows: [{ id: 'wf-001', name: 'Stripe Payments', active: false }],
     });
     cleanup = ctx.cleanup;
 
     const callback = ctx.createCallback();
     const result = await activateWorkflowAction.handler(
       ctx.runtime,
-      ctx.createMessage("Activate Stripe"),
+      ctx.createMessage('Activate Stripe'),
       ctx.state,
       {},
-      callback,
+      callback
     );
 
-    expect(result.success).toBe(false);
+    expect(result?.success).toBe(false);
     const errorText = (callback as any).mock.calls.at(-1)[0].text;
-    expect(errorText).toContain("Insufficient permissions");
+    expect(errorText).toContain('Insufficient permissions');
   });
 });
 
@@ -147,46 +144,41 @@ describe("E2E: ACTIVATE workflow", () => {
 // DEACTIVATE — Full chain
 // ============================================================================
 
-describe("E2E: DEACTIVATE workflow", () => {
+describe('E2E: DEACTIVATE workflow', () => {
   let cleanup: () => void;
 
   afterEach(() => cleanup?.());
 
-  test("full chain: deactivates workflow via real service and API", async () => {
+  test('full chain: deactivates workflow via real service and API', async () => {
     const deactivatedWf = createWorkflowResponse({
-      id: "wf-001",
+      id: 'wf-001',
       active: false,
     });
 
     const ctx = createE2ERuntime({
       fetchResponses: new Map([
-        [
-          "/workflows/wf-001/deactivate",
-          () => jsonResponse(200, deactivatedWf),
-        ],
+        ['/workflows/wf-001/deactivate', () => jsonResponse(200, deactivatedWf)],
       ]),
       useModelResponse: mock(() => Promise.resolve(createMatchResult())),
-      workflows: [{ id: "wf-001", name: "Stripe Payments", active: true }],
+      workflows: [{ id: 'wf-001', name: 'Stripe Payments', active: true }],
     });
     cleanup = ctx.cleanup;
 
     const callback = ctx.createCallback();
     const result = await deactivateWorkflowAction.handler(
       ctx.runtime,
-      ctx.createMessage("Pause the Stripe workflow"),
+      ctx.createMessage('Pause the Stripe workflow'),
       ctx.state,
       {},
-      callback,
+      callback
     );
 
-    expect(result.success).toBe(true);
+    expect(result?.success).toBe(true);
 
     const fetchCalls = ctx.fetchMock.mock.calls as [string, RequestInit][];
-    const deactivateCall = fetchCalls.find(([url]) =>
-      url.includes("/workflows/wf-001/deactivate"),
-    );
+    const deactivateCall = fetchCalls.find(([url]) => url.includes('/workflows/wf-001/deactivate'));
     expect(deactivateCall).toBeDefined();
-    expect(deactivateCall![1].method).toBe("POST");
+    expect(deactivateCall![1].method).toBe('POST');
   });
 });
 
@@ -194,85 +186,35 @@ describe("E2E: DEACTIVATE workflow", () => {
 // DELETE — Full chain
 // ============================================================================
 
-describe("E2E: DELETE workflow", () => {
+describe('E2E: DELETE workflow', () => {
   let cleanup: () => void;
 
   afterEach(() => cleanup?.());
 
-  test("full chain: deletes workflow via real service and API", async () => {
+  test('full chain: deletes workflow via real service and API', async () => {
     const ctx = createE2ERuntime({
-      fetchResponses: new Map([["/workflows/wf-001", () => jsonResponse(204)]]),
+      fetchResponses: new Map([['/workflows/wf-001', () => jsonResponse(204)]]),
       useModelResponse: mock(() => Promise.resolve(createMatchResult())),
-      workflows: [{ id: "wf-001", name: "Stripe Payments", active: false }],
+      workflows: [{ id: 'wf-001', name: 'Stripe Payments', active: false }],
     });
     cleanup = ctx.cleanup;
 
     const callback = ctx.createCallback();
     const result = await deleteWorkflowAction.handler(
       ctx.runtime,
-      ctx.createMessage("Delete the Stripe workflow"),
+      ctx.createMessage('Delete the Stripe workflow'),
       ctx.state,
       {},
-      callback,
+      callback
     );
 
-    expect(result.success).toBe(true);
+    expect(result?.success).toBe(true);
 
     const fetchCalls = ctx.fetchMock.mock.calls as [string, RequestInit][];
     const deleteCall = fetchCalls.find(
-      ([url, opts]) =>
-        url.includes("/workflows/wf-001") && opts.method === "DELETE",
+      ([url, opts]) => url.includes('/workflows/wf-001') && opts.method === 'DELETE'
     );
     expect(deleteCall).toBeDefined();
-  });
-});
-
-// ============================================================================
-// EXECUTE — Full chain
-// ============================================================================
-
-describe("E2E: EXECUTE workflow", () => {
-  let cleanup: () => void;
-
-  afterEach(() => cleanup?.());
-
-  test("full chain: executes workflow and returns execution ID", async () => {
-    const execution = createExecution({
-      id: "exec-777",
-      status: "running",
-      workflowId: "wf-001",
-    });
-
-    const ctx = createE2ERuntime({
-      fetchResponses: new Map([
-        ["/workflows/wf-001/execute", () => jsonResponse(200, execution)],
-      ]),
-    });
-    cleanup = ctx.cleanup;
-
-    // executeWorkflow reads state.workflowId (top-level, not in data)
-    const state: State = { ...ctx.state, workflowId: "wf-001" };
-
-    const callback = ctx.createCallback();
-    const result = await executeWorkflowAction.handler(
-      ctx.runtime,
-      ctx.createMessage("Run the Stripe workflow"),
-      state,
-      {},
-      callback,
-    );
-
-    expect(result.success).toBe(true);
-    const callbackText = (callback as any).mock.calls.at(-1)[0].text;
-    expect(callbackText).toContain("exec-777");
-
-    // Verify the real fetch was called
-    const fetchCalls = ctx.fetchMock.mock.calls as [string, RequestInit][];
-    const execCall = fetchCalls.find(([url]) =>
-      url.includes("/workflows/wf-001/execute"),
-    );
-    expect(execCall).toBeDefined();
-    expect(execCall![1].method).toBe("POST");
   });
 });
 
@@ -280,22 +222,22 @@ describe("E2E: EXECUTE workflow", () => {
 // LIST WORKFLOWS — Full chain (service → API → fetch)
 // ============================================================================
 
-describe("E2E: LIST workflows", () => {
+describe('E2E: LIST workflows', () => {
   let cleanup: () => void;
 
   afterEach(() => cleanup?.());
 
-  test("full chain: lists workflows from real API client", async () => {
+  test('full chain: lists workflows from real API client', async () => {
     const workflows = [
       createWorkflowResponse({
-        id: "wf-001",
-        name: "Stripe",
+        id: 'wf-001',
+        name: 'Stripe',
         active: true,
         tags: [USER_TAG],
       }),
       createWorkflowResponse({
-        id: "wf-002",
-        name: "Gmail",
+        id: 'wf-002',
+        name: 'Gmail',
         active: false,
         tags: [USER_TAG],
       }),
@@ -303,8 +245,8 @@ describe("E2E: LIST workflows", () => {
 
     const ctx = createE2ERuntime({
       fetchResponses: new Map([
-        ["/tags", () => jsonResponse(200, { data: [USER_TAG] })],
-        ["/workflows", () => jsonResponse(200, { data: workflows })],
+        ['/tags', () => jsonResponse(200, { data: [USER_TAG] })],
+        ['/workflows', () => jsonResponse(200, { data: workflows })],
       ]),
     });
     cleanup = ctx.cleanup;
@@ -312,16 +254,16 @@ describe("E2E: LIST workflows", () => {
     const callback = ctx.createCallback();
     const result = await listWorkflowsAction.handler(
       ctx.runtime,
-      ctx.createMessage("Show my workflows"),
+      ctx.createMessage('Show my workflows'),
       ctx.state,
       {},
-      callback,
+      callback
     );
 
-    expect(result.success).toBe(true);
+    expect(result?.success).toBe(true);
     const callbackText = (callback as any).mock.calls[0][0].text;
-    expect(callbackText).toContain("Stripe");
-    expect(callbackText).toContain("Gmail");
+    expect(callbackText).toContain('Stripe');
+    expect(callbackText).toContain('Gmail');
   });
 });
 
@@ -329,45 +271,43 @@ describe("E2E: LIST workflows", () => {
 // GET EXECUTIONS — Full chain
 // ============================================================================
 
-describe("E2E: GET EXECUTIONS", () => {
+describe('E2E: GET EXECUTIONS', () => {
   let cleanup: () => void;
 
   afterEach(() => cleanup?.());
 
-  test("full chain: fetches execution history from real API", async () => {
+  test('full chain: fetches execution history from real API', async () => {
     const executions = [
-      createExecution({ id: "exec-001", status: "success" }),
-      createExecution({ id: "exec-002", status: "error" }),
+      createExecution({ id: 'exec-001', status: 'success' }),
+      createExecution({ id: 'exec-002', status: 'error' }),
     ];
 
     const ctx = createE2ERuntime({
-      fetchResponses: new Map([
-        ["/executions", () => jsonResponse(200, { data: executions })],
-      ]),
+      fetchResponses: new Map([['/executions', () => jsonResponse(200, { data: executions })]]),
     });
     cleanup = ctx.cleanup;
 
     // getExecutionsAction reads state?.workflowId (top-level, not state.data)
-    const state: State = { ...ctx.state, workflowId: "wf-001" };
+    const state: State = { ...ctx.state, workflowId: 'wf-001' };
 
     const callback = ctx.createCallback();
     const result = await getExecutionsAction.handler(
       ctx.runtime,
-      ctx.createMessage("Show executions for workflow wf-001"),
+      ctx.createMessage('Show executions for workflow wf-001'),
       state,
       {},
-      callback,
+      callback
     );
 
-    expect(result.success).toBe(true);
+    expect(result?.success).toBe(true);
     const callbackText = (callback as any).mock.calls.at(-1)[0].text;
-    expect(callbackText).toContain("SUCCESS");
-    expect(callbackText).toContain("ERROR");
+    expect(callbackText).toContain('SUCCESS');
+    expect(callbackText).toContain('ERROR');
 
     // Verify correct API call with workflowId filter
     const fetchCalls = ctx.fetchMock.mock.calls as [string, RequestInit][];
-    const execCall = fetchCalls.find(([url]) => url.includes("/executions"));
-    expect(execCall![0]).toContain("workflowId=wf-001");
+    const execCall = fetchCalls.find(([url]) => url.includes('/executions'));
+    expect(execCall![0]).toContain('workflowId=wf-001');
   });
 });
 
@@ -375,16 +315,16 @@ describe("E2E: GET EXECUTIONS", () => {
 // PROVIDER → ACTION data flow (E2E)
 // ============================================================================
 
-describe("E2E: Provider → Action data flow", () => {
+describe('E2E: Provider → Action data flow', () => {
   let cleanup: () => void;
 
   afterEach(() => cleanup?.());
 
-  test("activeWorkflowsProvider populates state consumed by activate action", async () => {
+  test('activeWorkflowsProvider populates state consumed by activate action', async () => {
     const workflows = [
       createWorkflowResponse({
-        id: "wf-001",
-        name: "Stripe",
+        id: 'wf-001',
+        name: 'Stripe',
         active: false,
         tags: [USER_TAG],
       }),
@@ -392,19 +332,15 @@ describe("E2E: Provider → Action data flow", () => {
 
     const ctx = createE2ERuntime({
       fetchResponses: new Map([
-        ["/tags", () => jsonResponse(200, { data: [USER_TAG] })],
-        ["/workflows", () => jsonResponse(200, { data: workflows })],
+        ['/tags', () => jsonResponse(200, { data: [USER_TAG] })],
+        ['/workflows', () => jsonResponse(200, { data: workflows })],
         [
-          "/workflows/wf-001/activate",
-          () =>
-            jsonResponse(
-              200,
-              createWorkflowResponse({ id: "wf-001", active: true }),
-            ),
+          '/workflows/wf-001/activate',
+          () => jsonResponse(200, createWorkflowResponse({ id: 'wf-001', active: true })),
         ],
       ]),
       useModelResponse: mock(() =>
-        Promise.resolve(createMatchResult({ matchedWorkflowId: "wf-001" })),
+        Promise.resolve(createMatchResult({ matchedWorkflowId: 'wf-001' }))
       ),
     });
     cleanup = ctx.cleanup;
@@ -412,14 +348,12 @@ describe("E2E: Provider → Action data flow", () => {
     // Step 1: Provider fetches workflows from API
     const providerResult = await activeWorkflowsProvider.get(
       ctx.runtime,
-      ctx.createMessage(""),
-      ctx.state,
+      ctx.createMessage(''),
+      ctx.state
     );
 
     expect(providerResult.data).toBeDefined();
-    expect(
-      (providerResult.data as Record<string, unknown>).workflows,
-    ).toHaveLength(1);
+    expect((providerResult.data as Record<string, unknown>).workflows).toHaveLength(1);
 
     // Step 2: Action uses provider data in state
     const stateWithWorkflows: State = {
@@ -430,13 +364,13 @@ describe("E2E: Provider → Action data flow", () => {
     const callback = ctx.createCallback();
     const result = await activateWorkflowAction.handler(
       ctx.runtime,
-      ctx.createMessage("Activate Stripe"),
+      ctx.createMessage('Activate Stripe'),
       stateWithWorkflows,
       {},
-      callback,
+      callback
     );
 
-    expect(result.success).toBe(true);
+    expect(result?.success).toBe(true);
 
     // Verify the full chain happened: tags API → workflows API → activate API
     const fetchCalls = ctx.fetchMock.mock.calls as [string, RequestInit][];

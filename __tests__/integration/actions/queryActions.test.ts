@@ -1,7 +1,6 @@
 import { describe, test, expect, mock } from 'bun:test';
 import { listWorkflowsAction } from '../../../src/actions/listWorkflows';
 import { getExecutionsAction } from '../../../src/actions/getExecutions';
-import { executeWorkflowAction } from '../../../src/actions/executeWorkflow';
 import { N8N_WORKFLOW_SERVICE_TYPE } from '../../../src/services/n8n-workflow-service';
 import {
   createMockRuntime,
@@ -55,7 +54,7 @@ describe('LIST_N8N_WORKFLOWS action', () => {
       callback
     );
 
-    expect(result.success).toBe(true);
+    expect(result?.success).toBe(true);
     const callText = (callback as any).mock.calls[0][0].text;
     expect(callText).toContain("don't have any");
   });
@@ -118,7 +117,7 @@ describe('GET_N8N_EXECUTIONS action', () => {
       callback
     );
 
-    expect(result.success).toBe(true);
+    expect(result?.success).toBe(true);
     expect(mockService.getWorkflowExecutions).toHaveBeenCalledWith('wf-001', 10);
   });
 
@@ -136,7 +135,7 @@ describe('GET_N8N_EXECUTIONS action', () => {
       callback
     );
 
-    expect(result.success).toBe(false);
+    expect(result?.success).toBe(false);
     const callText = (callback as any).mock.calls[0][0].text;
     expect(callText).toContain('workflow ID');
   });
@@ -182,66 +181,5 @@ describe('GET_N8N_EXECUTIONS action', () => {
     expect(callText).toContain('SUCCESS');
     expect(callText).toContain('ERROR');
     expect(callText).toContain('timeout');
-  });
-});
-
-// ============================================================================
-// EXECUTE_N8N_WORKFLOW
-// ============================================================================
-
-describe('EXECUTE_N8N_WORKFLOW action', () => {
-  test('executes workflow successfully', async () => {
-    const mockService = createMockService();
-    const runtime = createMockRuntime({
-      services: { [N8N_WORKFLOW_SERVICE_TYPE]: mockService },
-    });
-    const state = createMockState({ workflowId: 'wf-001' } as any);
-    const callback = createMockCallback();
-
-    const result = await executeWorkflowAction.handler(
-      runtime,
-      createMockMessage(),
-      state,
-      {},
-      callback
-    );
-
-    expect(result.success).toBe(true);
-    expect(mockService.executeWorkflow).toHaveBeenCalledWith('wf-001');
-  });
-
-  test('fails when no workflow ID', async () => {
-    const runtime = createMockRuntime({
-      services: { [N8N_WORKFLOW_SERVICE_TYPE]: createMockService() },
-    });
-    const callback = createMockCallback();
-
-    const result = await executeWorkflowAction.handler(
-      runtime,
-      createMockMessage(),
-      createMockState(),
-      {},
-      callback
-    );
-
-    expect(result.success).toBe(false);
-  });
-
-  test('includes execution ID in response', async () => {
-    const mockService = createMockService({
-      executeWorkflow: mock(() =>
-        Promise.resolve(createExecution({ id: 'exec-999', status: 'running' }))
-      ),
-    });
-    const runtime = createMockRuntime({
-      services: { [N8N_WORKFLOW_SERVICE_TYPE]: mockService },
-    });
-    const state = createMockState({ workflowId: 'wf-001' } as any);
-    const callback = createMockCallback();
-
-    await executeWorkflowAction.handler(runtime, createMockMessage(), state, {}, callback);
-
-    const callText = (callback as any).mock.calls[0][0].text;
-    expect(callText).toContain('exec-999');
   });
 });
