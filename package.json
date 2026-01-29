@@ -1,6 +1,6 @@
 {
   "name": "@elizaos/plugin-n8n-workflow",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "ElizaOS plugin for generating and managing n8n workflows from natural language",
   "type": "module",
   "main": "dist/index.js",
@@ -55,6 +55,19 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "agentConfig": {
+    "pluginType": "elizaos:plugin:1.0.0",
+    "pluginParameters": {
+      "N8N_API_KEY": {
+        "type": "string",
+        "description": "n8n API key for authentication"
+      },
+      "N8N_HOST": {
+        "type": "string",
+        "description": "n8n instance URL (e.g., https://your.n8n.cloud)"
+      }
+    }
   },
   "engines": {
     "node": ">=20.0.0"
