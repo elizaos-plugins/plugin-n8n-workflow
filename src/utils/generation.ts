@@ -179,6 +179,11 @@ Generate a valid n8n workflow JSON that fulfills this request.`;
     );
   }
 
+  // Ensure workflow has a name (n8n API requires it)
+  if (!workflow.name) {
+    workflow.name = `Workflow - ${userPrompt.slice(0, 50).trim()}`;
+  }
+
   // Basic validation
   if (!workflow.nodes || !Array.isArray(workflow.nodes)) {
     throw new Error('Invalid workflow: missing or invalid nodes array');

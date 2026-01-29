@@ -8,6 +8,8 @@ import {
   N8nPluginConfig,
   N8nCredentialSchema,
   UserTokens,
+  N8N_CREDENTIAL_STORE_TYPE,
+  N8nCredentialStoreApi,
 } from '../types/index';
 import { N8nApiClient } from './api';
 
@@ -50,7 +52,8 @@ export async function resolveCredentials(
         userId,
         oauthService as OAuthService,
         apiClient,
-        missingConnections
+        missingConnections,
+        runtime
       );
     } else if (config.credentials?.[credType]) {
       credId = config.credentials[credType];
@@ -99,11 +102,16 @@ async function resolveWithOAuth(
   userId: string,
   oauthService: OAuthService,
   apiClient: N8nApiClient,
-  missingConnections: MissingConnection[]
+  missingConnections: MissingConnection[],
+  runtime: IAgentRuntime
 ): Promise<string | null> {
-  const existingCredId = await oauthService.getN8nCredId(userId, credType);
-  if (existingCredId) {
-    return existingCredId;
+  // Check credential store for existing mapping
+  const credStore = runtime.getService(N8N_CREDENTIAL_STORE_TYPE) as unknown as
+    | N8nCredentialStoreApi
+    | undefined;
+  const cachedId = await credStore?.get(userId, credType);
+  if (cachedId) {
+    return cachedId;
   }
 
   const hasConnection = await oauthService.hasConnection(userId, credType);
@@ -134,7 +142,8 @@ async function resolveWithOAuth(
       data: credData,
     });
 
-    await oauthService.setN8nCredId(userId, credType, credential.id);
+    // Persist mapping in credential store
+    await credStore?.set(userId, credType, credential.id);
 
     return credential.id;
   } catch (error) {

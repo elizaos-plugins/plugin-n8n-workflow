@@ -138,11 +138,7 @@ export function validateWorkflow(workflow: N8nWorkflow): WorkflowValidationResul
     fixedWorkflow = autoFixWorkflow(workflow);
   }
 
-  // Return result
-  const valid = errors.length === 0;
-
-  if (!valid && errors.length > 0) {
-    // Validation failed with errors
+  if (errors.length > 0) {
     return { valid: false, errors, warnings };
   }
 

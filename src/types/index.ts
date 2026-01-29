@@ -260,36 +260,12 @@ export interface UserTokens {
  * Duck-typed OAuth service interface.
  * Any service with serviceType = "oauth" implementing these methods will work.
  * Used for cloud mode with automatic OAuth credential injection.
+ *
  */
 export type OAuthService = {
-  /**
-   * Generate OAuth URL for user to authorize app connection
-   */
   getAuthUrl(userId: string, provider: string, scopes: string[]): Promise<string>;
-
-  /**
-   * Check if user has connected a specific app
-   */
   hasConnection(userId: string, credType: string): Promise<boolean>;
-
-  /**
-   * Get user's OAuth tokens for a credential type
-   */
   getTokens(userId: string, credType: string): Promise<UserTokens | null>;
-
-  /**
-   * Get existing n8n credential ID for user + credential type
-   */
-  getN8nCredId(userId: string, credType: string): Promise<string | null>;
-
-  /**
-   * Store n8n credential ID after creation
-   */
-  setN8nCredId(userId: string, credType: string, credId: string): Promise<void>;
-
-  /**
-   * Get platform's OAuth app config (clientId, clientSecret) for a provider
-   */
   getOAuthAppConfig?(provider: string): Promise<{
     clientId: string;
     clientSecret: string;
@@ -310,10 +286,17 @@ export function isOAuthService(service: unknown): service is OAuthService {
   return (
     typeof s.getAuthUrl === 'function' &&
     typeof s.hasConnection === 'function' &&
-    typeof s.getTokens === 'function' &&
-    typeof s.getN8nCredId === 'function' &&
-    typeof s.setN8nCredId === 'function'
+    typeof s.getTokens === 'function'
   );
+}
+
+// Credential store types
+
+export const N8N_CREDENTIAL_STORE_TYPE = 'n8n_credential_store';
+
+export interface N8nCredentialStoreApi {
+  get(userId: string, credType: string): Promise<string | null>;
+  set(userId: string, credType: string, n8nCredId: string): Promise<void>;
 }
 
 // Credential resolution types

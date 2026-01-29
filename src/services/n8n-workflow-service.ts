@@ -4,12 +4,7 @@ import { searchNodes } from '../utils/catalog';
 import { extractKeywords, generateWorkflow } from '../utils/generation';
 import { positionNodes, validateWorkflow } from '../utils/workflow';
 import { resolveCredentials, getMissingCredentials } from '../utils/credentialResolver';
-import type {
-  N8nWorkflowResponse,
-  N8nExecution,
-  N8nCredential,
-  WorkflowCreationResult,
-} from '../types/index';
+import type { N8nWorkflowResponse, N8nExecution, WorkflowCreationResult } from '../types/index';
 
 export const N8N_WORKFLOW_SERVICE_TYPE = 'n8n_workflow';
 
@@ -338,14 +333,5 @@ export class N8nWorkflowService extends Service {
   async getExecutionDetail(executionId: string): Promise<N8nExecution> {
     const client = this.getClient();
     return client.getExecution(executionId);
-  }
-
-  /**
-   * List available credentials (for local mode)
-   */
-  async listCredentials(): Promise<N8nCredential[]> {
-    const client = this.getClient();
-    const response = await client.listCredentials();
-    return response.data;
   }
 }

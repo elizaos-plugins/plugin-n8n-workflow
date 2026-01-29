@@ -139,22 +139,6 @@ export class N8nApiClient {
   }
 
   /**
-   * List credentials (filtered by type if provided)
-   * @see GET /credentials
-   */
-  async listCredentials(params?: { type?: string }): Promise<{ data: N8nCredential[] }> {
-    const query = new URLSearchParams();
-    if (params?.type) {
-      query.append('type', params.type);
-    }
-
-    return this.request<{ data: N8nCredential[] }>(
-      'GET',
-      `/credentials${query.toString() ? `?${query.toString()}` : ''}`
-    );
-  }
-
-  /**
    * Get credential schema for a specific type
    * @see GET /credentials/schema/{type}
    */
@@ -284,29 +268,24 @@ export class N8nApiClient {
         return undefined as T;
       }
 
-      if (response.status === 200) {
+      if (response.ok) {
         const text = await response.text();
-        // Empty 200 response - return undefined for void operations
         if (!text) {
           return undefined as T;
         }
-        // Non-empty response - parse JSON
         return JSON.parse(text) as T;
       }
 
-      // For other status codes, try to parse JSON for error messages
-      const data = (await response.json()) as { message?: string };
-
-      // Handle errors
-      if (!response.ok) {
-        throw new N8nApiError(
-          data.message || `n8n API error: ${response.statusText}`,
-          response.status,
-          data
-        );
+      // Non-2xx response — parse error body
+      let message = `n8n API error: ${response.statusText}`;
+      let errorData: unknown;
+      try {
+        errorData = await response.json();
+        message = (errorData as { message?: string }).message || message;
+      } catch {
+        // Response body not JSON — use statusText
       }
-
-      return data as T;
+      throw new N8nApiError(message, response.status, errorData);
     } catch (error) {
       if (error instanceof N8nApiError) {
         throw error;
