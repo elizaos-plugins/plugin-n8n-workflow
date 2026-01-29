@@ -7,73 +7,73 @@ import {
   logger,
   type Memory,
   type State,
-} from '@elizaos/core';
+} from "@elizaos/core";
 import {
   N8N_WORKFLOW_SERVICE_TYPE,
   type N8nWorkflowService,
-} from '../services/index';
-import { matchWorkflow } from '../utils/generation';
-import { buildConversationContext } from '../utils/context';
-import type { N8nWorkflow } from '../types/index';
+} from "../services/index";
+import { matchWorkflow } from "../utils/generation";
+import { buildConversationContext } from "../utils/context";
+import type { N8nWorkflow } from "../types/index";
 
 const examples: ActionExample[][] = [
   [
     {
-      name: '{{user1}}',
+      name: "{{user1}}",
       content: {
-        text: 'Enable my payment workflow',
+        text: "Enable my payment workflow",
       },
     },
     {
-      name: '{{agent}}',
+      name: "{{agent}}",
       content: {
         text: "I'll activate that workflow for you.",
-        actions: ['ACTIVATE_N8N_WORKFLOW'],
+        actions: ["ACTIVATE_N8N_WORKFLOW"],
       },
     },
   ],
   [
     {
-      name: '{{user1}}',
+      name: "{{user1}}",
       content: {
-        text: 'Turn on the Gmail automation',
+        text: "Turn on the Gmail automation",
       },
     },
     {
-      name: '{{agent}}',
+      name: "{{agent}}",
       content: {
-        text: 'Activating Gmail workflow now.',
-        actions: ['ACTIVATE_N8N_WORKFLOW'],
+        text: "Activating Gmail workflow now.",
+        actions: ["ACTIVATE_N8N_WORKFLOW"],
       },
     },
   ],
   [
     {
-      name: '{{user1}}',
+      name: "{{user1}}",
       content: {
-        text: 'Start the Stripe workflow abc123',
+        text: "Start the Stripe workflow abc123",
       },
     },
     {
-      name: '{{agent}}',
+      name: "{{agent}}",
       content: {
-        text: 'Starting workflow abc123.',
-        actions: ['ACTIVATE_N8N_WORKFLOW'],
+        text: "Starting workflow abc123.",
+        actions: ["ACTIVATE_N8N_WORKFLOW"],
       },
     },
   ],
 ];
 
 export const activateWorkflowAction: Action = {
-  name: 'ACTIVATE_N8N_WORKFLOW',
+  name: "ACTIVATE_N8N_WORKFLOW",
   similes: [
-    'ACTIVATE_WORKFLOW',
-    'ENABLE_WORKFLOW',
-    'START_WORKFLOW',
-    'TURN_ON_WORKFLOW',
+    "ACTIVATE_WORKFLOW",
+    "ENABLE_WORKFLOW",
+    "START_WORKFLOW",
+    "TURN_ON_WORKFLOW",
   ],
   description:
-    'Activate an n8n workflow to start processing triggers and running automatically. Identifies workflows by ID, name, or semantic description in any language.',
+    "Activate an n8n workflow to start processing triggers and running automatically. Identifies workflows by ID, name, or semantic description in any language.",
 
   validate: async (runtime: IAgentRuntime): Promise<boolean> => {
     const service = runtime.getService(N8N_WORKFLOW_SERVICE_TYPE);
@@ -93,12 +93,12 @@ export const activateWorkflowAction: Action = {
 
     if (!service) {
       logger.error(
-        { src: 'plugin:n8n-workflow:action:activate' },
-        'N8n Workflow service not available',
+        { src: "plugin:n8n-workflow:action:activate" },
+        "N8n Workflow service not available",
       );
       if (callback) {
         await callback({
-          text: 'N8n Workflow service is not available.',
+          text: "N8n Workflow service is not available.",
         });
       }
       return { success: false };
@@ -111,7 +111,7 @@ export const activateWorkflowAction: Action = {
       if (workflows.length === 0) {
         if (callback) {
           await callback({
-            text: 'No workflows available to activate.',
+            text: "No workflows available to activate.",
           });
         }
         return { success: false };
@@ -120,10 +120,10 @@ export const activateWorkflowAction: Action = {
       const context = buildConversationContext(runtime, message, state);
       const matchResult = await matchWorkflow(runtime, context, workflows);
 
-      if (!matchResult.matchedWorkflowId || matchResult.confidence === 'none') {
+      if (!matchResult.matchedWorkflowId || matchResult.confidence === "none") {
         const workflowList = matchResult.matches
           .map((m) => `- ${m.name} (ID: ${m.id})`)
-          .join('\n');
+          .join("\n");
 
         if (callback) {
           await callback({
@@ -136,22 +136,22 @@ export const activateWorkflowAction: Action = {
       await service.activateWorkflow(matchResult.matchedWorkflowId);
 
       logger.info(
-        { src: 'plugin:n8n-workflow:action:activate' },
+        { src: "plugin:n8n-workflow:action:activate" },
         `Activated workflow ${matchResult.matchedWorkflowId}`,
       );
 
       if (callback) {
         await callback({
-          text: '✅ Workflow activated and is now running.',
+          text: "✅ Workflow activated and is now running.",
         });
       }
 
       return { success: true };
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+        error instanceof Error ? error.message : "Unknown error";
       logger.error(
-        { src: 'plugin:n8n-workflow:action:activate' },
+        { src: "plugin:n8n-workflow:action:activate" },
         `Failed to activate workflow: ${errorMessage}`,
       );
 

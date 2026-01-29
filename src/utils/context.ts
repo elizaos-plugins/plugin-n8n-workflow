@@ -1,4 +1,4 @@
-import { type IAgentRuntime, type Memory, type State } from '@elizaos/core';
+import { type IAgentRuntime, type Memory, type State } from "@elizaos/core";
 
 /**
  * Build conversation context from recent messages
@@ -13,16 +13,16 @@ export function buildConversationContext(
   const recentMessages = (state?.data?.recentMessages as Memory[]) || [];
 
   if (recentMessages.length === 0) {
-    return message.content.text || '';
+    return message.content.text || "";
   }
 
   const context = recentMessages
     .slice(-5)
     .map(
       (m) =>
-        `${m.entityId === runtime.agentId ? 'Assistant' : 'User'}: ${m.content.text}`,
+        `${m.entityId === runtime.agentId ? "Assistant" : "User"}: ${m.content.text}`,
     )
-    .join('\n');
+    .join("\n");
 
-  return `Recent conversation:\n${context}\n\nCurrent request: ${message.content.text || ''}`;
+  return `Recent conversation:\n${context}\n\nCurrent request: ${message.content.text || ""}`;
 }
