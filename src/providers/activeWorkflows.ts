@@ -8,7 +8,7 @@ import {
 import {
   N8N_WORKFLOW_SERVICE_TYPE,
   type N8nWorkflowService,
-} from '../services/index.js';
+} from '../services/index';
 
 /**
  * Provider that enriches state with user's active workflows
@@ -22,7 +22,7 @@ export const activeWorkflowsProvider: Provider = {
   name: 'ACTIVE_N8N_WORKFLOWS',
   description: "User's active n8n workflows with IDs and descriptions",
 
-  get: async (runtime: IAgentRuntime, message: Memory, _state: State) => {
+  get: async (runtime: IAgentRuntime, _message: Memory, _state: State) => {
     try {
       const service = runtime.getService<N8nWorkflowService>(
         N8N_WORKFLOW_SERVICE_TYPE,
@@ -36,7 +36,7 @@ export const activeWorkflowsProvider: Provider = {
         };
       }
 
-      const userId = (message.userId as string) || undefined;
+      const userId = _message.entityId;
       const workflows = await service.listWorkflows(userId);
 
       if (workflows.length === 0) {
@@ -47,45 +47,16 @@ export const activeWorkflowsProvider: Provider = {
         };
       }
 
-      // Format workflows for LLM context
       const workflowList = workflows
-        .slice(0, 20) // Limit to 20 most recent
+        .slice(0, 20)
         .map((wf) => {
           const status = wf.active ? 'ACTIVE' : 'INACTIVE';
           const nodeCount = wf.nodes?.length || 0;
-
           return `- **${wf.name}** (ID: ${wf.id}, Status: ${status}, Nodes: ${nodeCount})`;
         })
         .join('\n');
 
       const text = `# Available Workflows\n\n${workflowList}`;
-
-      // Create workflow lookup for easy access
-      const workflowMap: Record<
-        string,
-        { id: string; name: string; active: boolean }
-      > = {};
-      const workflowsByKeyword: Record<string, string[]> = {};
-
-      for (const wf of workflows) {
-        workflowMap[wf.id] = {
-          id: wf.id,
-          name: wf.name,
-          active: wf.active || false,
-        };
-
-        // Index by keywords from workflow name for semantic matching
-        const keywords = wf.name.toLowerCase().split(/\s+/);
-        for (const keyword of keywords) {
-          if (keyword.length > 3) {
-            // Ignore short words
-            if (!workflowsByKeyword[keyword]) {
-              workflowsByKeyword[keyword] = [];
-            }
-            workflowsByKeyword[keyword].push(wf.id);
-          }
-        }
-      }
 
       return {
         text,
@@ -96,8 +67,6 @@ export const activeWorkflowsProvider: Provider = {
             active: wf.active || false,
             nodeCount: wf.nodes?.length || 0,
           })),
-          workflowMap,
-          workflowsByKeyword,
         },
         values: {
           hasWorkflows: true,
@@ -106,6 +75,7 @@ export const activeWorkflowsProvider: Provider = {
       };
     } catch (error) {
       logger.error(
+        { src: 'plugin:n8n-workflow:providers:active-workflows' },
         `Failed to get active workflows: ${error instanceof Error ? error.message : String(error)}`,
       );
       return {

@@ -293,7 +293,9 @@ export type OAuthService = {
  * Type guard to check if a service implements OAuthService interface
  */
 export function isOAuthService(service: unknown): service is OAuthService {
-  if (!service || typeof service !== 'object') {return false;}
+  if (!service || typeof service !== 'object') {
+    return false;
+  }
 
   const s = service as Record<string, unknown>;
 
@@ -316,8 +318,6 @@ export interface CredentialResolutionResult {
 
 export interface MissingConnection {
   credType: string;
-  displayName: string;
-  provider: string;
   oauthUrl?: string; // Only in cloud mode
 }
 
@@ -345,7 +345,7 @@ export interface GetExecutionsParams {
   status?: 'success' | 'error' | 'running' | 'waiting';
 }
 
-export interface WorkflowCreationResult {
+export interface WorkflowCreationResult extends Record<string, unknown> {
   id: string;
   name: string;
   active: boolean;

@@ -1,13 +1,19 @@
-import { type IAgentRuntime, logger, type Provider } from '@elizaos/core';
+import {
+  type IAgentRuntime,
+  logger,
+  type Memory,
+  type Provider,
+  type State,
+} from '@elizaos/core';
 import {
   N8N_WORKFLOW_SERVICE_TYPE,
   type N8nWorkflowService,
-} from '../services/index.js';
+} from '../services/index';
 
 export const workflowStatusProvider: Provider = {
   name: 'n8n_workflow_status',
 
-  get: async (runtime: IAgentRuntime, _message?: unknown): Promise<string> => {
+  get: async (runtime: IAgentRuntime, _message: Memory, _state: State) => {
     try {
       const service = runtime.getService<N8nWorkflowService>(
         N8N_WORKFLOW_SERVICE_TYPE,
@@ -15,27 +21,32 @@ export const workflowStatusProvider: Provider = {
 
       if (!service) {
         logger.warn(
-        { src: 'plugin:n8n-workflow:provider:workflowStatus' },
-        'N8n Workflow service not available for provider');
-        return '';
+          { src: 'plugin:n8n-workflow:provider:workflowStatus' },
+          'N8n Workflow service not available for provider',
+        );
+        return {
+          text: '',
+          data: {},
+          values: {},
+        };
       }
 
-      // Get workflows (optionally filtered by user if message has userId)
-      const userId =
-        _message && typeof _message === 'object' && 'userId' in _message
-          ? (_message.userId as string)
-          : undefined;
+      // Get workflows for the user
+      const userId = _message.entityId;
 
       const workflows = await service.listWorkflows(userId);
 
       if (workflows.length === 0) {
-        return 'No n8n workflows configured yet.';
+        return {
+          text: 'No n8n workflows configured yet.',
+          data: {},
+          values: {},
+        };
       }
 
       let status = `Current n8n workflows (${workflows.length}):\n\n`;
 
       for (const workflow of workflows.slice(0, 10)) {
-        // Limit to 10 for context
         const statusEmoji = workflow.active ? '✅' : '⏸️';
         status += `${statusEmoji} ${workflow.name} (ID: ${workflow.id})\n`;
         status += `   Nodes: ${workflow.nodes?.length || 0}\n`;
@@ -56,9 +67,10 @@ export const workflowStatusProvider: Provider = {
                   : '⏳';
             status += `   Last run: ${execEmoji} ${lastExec.status} at ${new Date(lastExec.startedAt).toLocaleString()}\n`;
           }
-        } catch (error) {
+        } catch (_error) {
           // Ignore execution fetch errors
           logger.debug(
+            { src: 'plugin:n8n-workflow:provider:workflowStatus' },
             `Could not fetch executions for workflow ${workflow.id}`,
           );
         }
@@ -70,12 +82,21 @@ export const workflowStatusProvider: Provider = {
         status += `\n... and ${workflows.length - 10} more workflows.`;
       }
 
-      return status;
+      return {
+        text: status,
+        data: { workflows },
+        values: { workflowCount: workflows.length },
+      };
     } catch (error) {
       logger.error(
+        { src: 'plugin:n8n-workflow:provider:workflowStatus' },
         `Failed to get workflow status: ${error instanceof Error ? error.message : String(error)}`,
       );
-      return '';
+      return {
+        text: '',
+        data: {},
+        values: {},
+      };
     }
   },
 };

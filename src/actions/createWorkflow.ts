@@ -8,132 +8,85 @@ import {
   logger,
   type Memory,
   type State,
-} from "@elizaos/core";
+} from '@elizaos/core';
 import {
   N8N_WORKFLOW_SERVICE_TYPE,
   type N8nWorkflowService,
-} from "../services/index.js";
+} from '../services/index';
 
 const examples: ActionExample[][] = [
   [
     {
-      name: "{{user1}}",
+      name: '{{user1}}',
       content: {
-        text: "Create a workflow that sends me Stripe payment summaries every Monday via Gmail",
+        text: 'Create a workflow that sends me Stripe payment summaries every Monday via Gmail',
       },
     },
     {
-      name: "{{agent}}",
+      name: '{{agent}}',
       content: {
         text: "I'll create an n8n workflow that fetches Stripe payments weekly and emails you a summary via Gmail.",
-        actions: ["CREATE_N8N_WORKFLOW"],
+        actions: ['CREATE_N8N_WORKFLOW'],
       },
     },
   ],
   [
     {
-      name: "{{user1}}",
+      name: '{{user1}}',
       content: {
-        text: "Build a workflow to notify me on Slack when a new GitHub issue is created",
+        text: 'Build a workflow to notify me on Slack when a new GitHub issue is created',
       },
     },
     {
-      name: "{{agent}}",
+      name: '{{agent}}',
       content: {
-        text: "Creating a workflow that monitors GitHub for new issues and sends Slack notifications.",
-        actions: ["CREATE_N8N_WORKFLOW"],
+        text: 'Creating a workflow that monitors GitHub for new issues and sends Slack notifications.',
+        actions: ['CREATE_N8N_WORKFLOW'],
       },
     },
   ],
   [
     {
-      name: "{{user1}}",
+      name: '{{user1}}',
       content: {
-        text: "Set up automation to save Gmail attachments to Google Drive",
+        text: 'Set up automation to save Gmail attachments to Google Drive',
       },
     },
     {
-      name: "{{agent}}",
+      name: '{{agent}}',
       content: {
         text: "I'll build an n8n workflow that watches for Gmail attachments and automatically saves them to Google Drive.",
-        actions: ["CREATE_N8N_WORKFLOW"],
+        actions: ['CREATE_N8N_WORKFLOW'],
       },
     },
   ],
 ];
 
 export const createWorkflowAction: Action = {
-  name: "CREATE_N8N_WORKFLOW",
+  name: 'CREATE_N8N_WORKFLOW',
   similes: [
-    "CREATE_WORKFLOW",
-    "BUILD_WORKFLOW",
-    "GENERATE_WORKFLOW",
-    "MAKE_AUTOMATION",
-    "CREATE_AUTOMATION",
-    "BUILD_N8N_WORKFLOW",
-    "SETUP_WORKFLOW",
+    'CREATE_WORKFLOW',
+    'BUILD_WORKFLOW',
+    'GENERATE_WORKFLOW',
+    'MAKE_AUTOMATION',
+    'CREATE_AUTOMATION',
+    'BUILD_N8N_WORKFLOW',
+    'SETUP_WORKFLOW',
   ],
   description:
-    "Generate and deploy an n8n workflow from a natural language description. " +
-    "The workflow will be created using native n8n nodes (Gmail, Slack, Stripe, etc.) " +
-    "and deployed to n8n Cloud. Use this action when the user wants to automate a task " +
-    "or create an integration between different services.",
+    'Generate and deploy an n8n workflow from a natural language description. ' +
+    'The workflow will be created using native n8n nodes (Gmail, Slack, Stripe, etc.) ' +
+    'and deployed to n8n Cloud. Use this action when the user wants to automate a task ' +
+    'or create an integration between different services.',
 
-  validate: async (
-    runtime: IAgentRuntime,
-    message: Memory,
-    _state?: State,
-  ): Promise<boolean> => {
-    const service = runtime.getService(N8N_WORKFLOW_SERVICE_TYPE);
-    if (!service) {
-      return false;
-    }
-
-    const text = (message.content as Content).text?.toLowerCase() ?? "";
-
-    // Check for workflow creation keywords
-    const creationKeywords = [
-      "create",
-      "build",
-      "generate",
-      "make",
-      "setup",
-      "set up",
-    ];
-    const workflowKeywords = [
-      "workflow",
-      "automation",
-      "integration",
-      "automate",
-      "integrate",
-    ];
-
-    const hasCreationKeyword = creationKeywords.some((kw) => text.includes(kw));
-    const hasWorkflowKeyword = workflowKeywords.some((kw) => text.includes(kw));
-
-    // Also check for service integrations that typically indicate workflow creation
-    const serviceKeywords = [
-      "gmail",
-      "slack",
-      "stripe",
-      "github",
-      "google",
-      "calendar",
-      "webhook",
-      "http",
-      "api",
-      "email",
-      "schedule",
-    ];
-    const hasServiceKeyword = serviceKeywords.some((kw) => text.includes(kw));
-
-    return (hasCreationKeyword && hasWorkflowKeyword) || hasServiceKeyword;
+  validate: async (runtime: IAgentRuntime): Promise<boolean> => {
+    return !!runtime.getService(N8N_WORKFLOW_SERVICE_TYPE);
   },
 
   handler: async (
     runtime: IAgentRuntime,
     message: Memory,
-    state: State | undefined,
+    _state: State | undefined,
     _options?: unknown,
     callback?: HandlerCallback,
   ): Promise<ActionResult> => {
@@ -143,12 +96,12 @@ export const createWorkflowAction: Action = {
 
     if (!service) {
       logger.error(
-        { src: "plugin:n8n-workflow:action:create" },
-        "N8n Workflow service not available",
+        { src: 'plugin:n8n-workflow:action:create' },
+        'N8n Workflow service not available',
       );
       if (callback) {
         await callback({
-          text: "N8n Workflow service is not available. Please ensure the plugin is properly configured with N8N_API_KEY and N8N_HOST.",
+          text: 'N8n Workflow service is not available. Please ensure the plugin is properly configured with N8N_API_KEY and N8N_HOST.',
         });
       }
       return { success: false };
@@ -156,40 +109,40 @@ export const createWorkflowAction: Action = {
 
     try {
       const content = message.content as Content;
-      const prompt = (content.text ?? "").trim();
+      const prompt = (content.text ?? '').trim();
 
       if (!prompt) {
         logger.error(
-          { src: "plugin:n8n-workflow:action:create" },
-          "No prompt provided for workflow creation",
+          { src: 'plugin:n8n-workflow:action:create' },
+          'No prompt provided for workflow creation',
         );
         if (callback) {
           await callback({
-            text: "Please provide a description of the workflow you want to create.",
+            text: 'Please provide a description of the workflow you want to create.',
           });
         }
         return { success: false };
       }
 
       logger.info(
-        { src: "plugin:n8n-workflow:action:create" },
+        { src: 'plugin:n8n-workflow:action:create' },
         `Creating workflow from prompt: ${prompt.slice(0, 100)}...`,
       );
 
       if (callback) {
         await callback({
-          text: "Analyzing your request and searching for relevant n8n nodes...",
+          text: 'Analyzing your request and searching for relevant n8n nodes...',
         });
       }
 
       // Create workflow using the service's RAG pipeline
       const result = await service.createWorkflowFromPrompt(
         prompt,
-        (message.userId as string) || undefined,
+        message.entityId,
       );
 
       logger.info(
-        { src: "plugin:n8n-workflow:action:create" },
+        { src: 'plugin:n8n-workflow:action:create' },
         `Workflow created successfully: ${result.id} (${result.nodeCount} nodes)`,
       );
 
@@ -197,19 +150,19 @@ export const createWorkflowAction: Action = {
       let responseText = `✅ Workflow "${result.name}" created successfully!\n\n`;
       responseText += `**Workflow ID:** ${result.id}\n`;
       responseText += `**Nodes:** ${result.nodeCount}\n`;
-      responseText += `**Status:** ${result.active ? "Active" : "Inactive"}\n`;
+      responseText += `**Status:** ${result.active ? 'Active' : 'Inactive'}\n`;
 
       if (result.missingCredentials.length > 0) {
-        responseText += "\n⚠️  **Action Required:**\n";
-        responseText += "Please connect the following services in n8n Cloud:\n";
+        responseText += '\n⚠️  **Action Required:**\n';
+        responseText += 'Please connect the following services in n8n Cloud:\n';
         for (const credType of result.missingCredentials) {
           responseText += `- ${credType}\n`;
         }
         responseText +=
-          "\nThe workflow will be ready to run once these connections are configured.";
+          '\nThe workflow will be ready to run once these connections are configured.';
       } else {
         responseText +=
-          "\n✅ All credentials configured - workflow is ready to run!";
+          '\n✅ All credentials configured - workflow is ready to run!';
       }
 
       if (callback) {
@@ -224,9 +177,9 @@ export const createWorkflowAction: Action = {
       };
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
+        error instanceof Error ? error.message : 'Unknown error';
       logger.error(
-        { src: "plugin:n8n-workflow:action:create" },
+        { src: 'plugin:n8n-workflow:action:create' },
         `Failed to create workflow: ${errorMessage}`,
       );
 

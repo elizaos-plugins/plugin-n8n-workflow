@@ -1,3 +1,2 @@
-export { workflowStatusProvider } from './workflowStatus.js';
-export { capabilitiesProvider } from './capabilities.js';
-export { activeWorkflowsProvider } from './activeWorkflows.js';
+export { workflowStatusProvider } from './workflowStatus';
+export { activeWorkflowsProvider } from './activeWorkflows';

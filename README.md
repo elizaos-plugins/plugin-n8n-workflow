@@ -111,28 +111,26 @@ When used with `@eliza-cloud/plugin-oauth`, the plugin automatically handles OAu
 
 ## Architecture
 
-### Clean Code Organization
+### Code Organization
 
 ```
 src/
-├── api/              # n8n API client
-│   └── client.ts     # Full REST API coverage
-├── catalog/          # Node catalog & search
-│   └── search.ts     # Keyword-based node search
-├── generation/       # LLM workflow generation
-│   ├── keywords.ts   # Keyword extraction (OBJECT_SMALL)
-│   └── generator.ts  # Workflow generation (TEXT_LARGE)
-├── workflow/         # Workflow manipulation
-│   ├── validator.ts  # Structural validation
-│   └── positioner.ts # Auto-layout algorithm
-├── credentials/      # Credential management
-│   └── resolver.ts   # 3-mode resolution (cloud/local/placeholder)
-├── services/         # ElizaOS services
-├── actions/          # ElizaOS actions
-├── providers/        # ElizaOS providers
-├── types/            # TypeScript definitions
-├── prompts/          # LLM prompts
-└── data/             # Static data (node catalog)
+├── utils/
+│   ├── api.ts                # n8n API client (REST)
+│   ├── catalog.ts            # Node catalog search
+│   ├── generation.ts         # LLM keyword extraction + workflow generation
+│   ├── workflow.ts           # Validation + auto-positioning
+│   ├── credentialResolver.ts # Credential resolution (3 modes)
+│   └── context.ts            # Conversation context builder
+├── services/
+│   └── n8n-workflow-service.ts
+├── actions/                  # 8 actions (create, list, activate, etc.)
+├── providers/                # 2 providers (status, active workflows)
+├── schemas/                  # JSON schemas for LLM structured output
+├── prompts/                  # System prompts
+├── types/                    # TypeScript types
+└── data/
+    └── defaultNodes.json     # 457 n8n node definitions
 ```
 
 ### RAG Pipeline

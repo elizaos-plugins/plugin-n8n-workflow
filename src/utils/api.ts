@@ -6,7 +6,7 @@ import {
   N8nExecution,
   N8nTag,
   N8nApiError,
-} from '../types/index.js';
+} from '../types/index';
 
 /**
  * n8n REST API client
@@ -45,11 +45,18 @@ export class N8nApiClient {
     cursor?: string;
   }): Promise<{ data: N8nWorkflowResponse[]; nextCursor?: string }> {
     const query = new URLSearchParams();
-    if (params?.active !== undefined)
-    {query.append('active', params.active.toString());}
-    if (params?.tags) {params.tags.forEach((tag) => query.append('tags', tag));}
-    if (params?.limit) {query.append('limit', params.limit.toString());}
-    if (params?.cursor) {query.append('cursor', params.cursor);}
+    if (params?.active !== undefined) {
+      query.append('active', params.active.toString());
+    }
+    if (params?.tags) {
+      params.tags.forEach((tag) => query.append('tags', tag));
+    }
+    if (params?.limit) {
+      query.append('limit', params.limit.toString());
+    }
+    if (params?.cursor) {
+      query.append('cursor', params.cursor);
+    }
 
     return this.request<{ data: N8nWorkflowResponse[]; nextCursor?: string }>(
       'GET',
@@ -155,7 +162,9 @@ export class N8nApiClient {
     type?: string;
   }): Promise<{ data: N8nCredential[] }> {
     const query = new URLSearchParams();
-    if (params?.type) {query.append('type', params.type);}
+    if (params?.type) {
+      query.append('type', params.type);
+    }
 
     return this.request<{ data: N8nCredential[] }>(
       'GET',
@@ -197,10 +206,18 @@ export class N8nApiClient {
     cursor?: string;
   }): Promise<{ data: N8nExecution[]; nextCursor?: string }> {
     const query = new URLSearchParams();
-    if (params?.workflowId) {query.append('workflowId', params.workflowId);}
-    if (params?.status) {query.append('status', params.status);}
-    if (params?.limit) {query.append('limit', params.limit.toString());}
-    if (params?.cursor) {query.append('cursor', params.cursor);}
+    if (params?.workflowId) {
+      query.append('workflowId', params.workflowId);
+    }
+    if (params?.status) {
+      query.append('status', params.status);
+    }
+    if (params?.limit) {
+      query.append('limit', params.limit.toString());
+    }
+    if (params?.cursor) {
+      query.append('cursor', params.cursor);
+    }
 
     return this.request<{ data: N8nExecution[]; nextCursor?: string }>(
       'GET',
@@ -253,7 +270,9 @@ export class N8nApiClient {
     const existing = tags.find(
       (tag) => tag.name.toLowerCase() === name.toLowerCase(),
     );
-    if (existing) {return existing;}
+    if (existing) {
+      return existing;
+    }
     return this.createTag(name);
   }
 
@@ -295,13 +314,15 @@ export class N8nApiClient {
       if (response.status === 200) {
         const text = await response.text();
         // Empty 200 response - return undefined for void operations
-        if (!text) {return undefined as T;}
+        if (!text) {
+          return undefined as T;
+        }
         // Non-empty response - parse JSON
         return JSON.parse(text) as T;
       }
 
       // For other status codes, try to parse JSON for error messages
-      const data = await response.json();
+      const data = (await response.json()) as { message?: string };
 
       // Handle errors
       if (!response.ok) {

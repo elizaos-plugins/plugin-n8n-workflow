@@ -1,4 +1,4 @@
-import { NodeDefinition, NodeSearchResult } from '../types/index.js';
+import { NodeDefinition, NodeSearchResult } from '../types/index';
 import defaultNodesData from '../data/defaultNodes.json' assert { type: 'json' };
 
 /**
@@ -94,82 +94,4 @@ export function searchNodes(
     .filter((result) => result.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
-}
-
-/**
- * Get a specific node by name (case-insensitive exact match)
- * @param name - Node name or display name
- * @returns The node definition or undefined if not found
- *
- * @example
- * ```typescript
- * const gmailNode = getNodeByName("gmail");
- * const scheduleNode = getNodeByName("Schedule Trigger");
- * ```
- */
-export function getNodeByName(name: string): NodeDefinition | undefined {
-  const normalized = name.toLowerCase().trim();
-  return NODE_CATALOG.find(
-    (node) =>
-      node.name.toLowerCase() === normalized ||
-      node.displayName.toLowerCase() === normalized,
-  );
-}
-
-/**
- * Get all nodes in a specific category
- * @param category - Category name (e.g., "trigger", "transform", "communication")
- * @returns Array of nodes in that category
- *
- * @example
- * ```typescript
- * const triggerNodes = getNodesByCategory("trigger");
- * const communicationNodes = getNodesByCategory("communication");
- * ```
- */
-export function getNodesByCategory(category: string): NodeDefinition[] {
-  const normalized = category.toLowerCase().trim();
-  return NODE_CATALOG.filter((node) =>
-    node.group.some((group) => group.toLowerCase().includes(normalized)),
-  );
-}
-
-/**
- * Get catalog statistics
- * @returns Object with catalog metadata
- */
-export function getCatalogStats() {
-  const categories = new Set<string>();
-  const credentialTypes = new Set<string>();
-
-  NODE_CATALOG.forEach((node) => {
-    node.group.forEach((group) => categories.add(group));
-    node.credentials?.forEach((cred) => credentialTypes.add(cred.name));
-  });
-
-  return {
-    totalNodes: NODE_CATALOG.length,
-    categories: Array.from(categories).sort(),
-    credentialTypes: Array.from(credentialTypes).sort(),
-    lastUpdated: '2025-04-26', // From git log
-  };
-}
-
-/**
- * Find nodes that require a specific credential type
- * @param credentialType - n8n credential type (e.g., "gmailOAuth2Api")
- * @returns Array of nodes that use this credential
- *
- * @example
- * ```typescript
- * const gmailNodes = getNodesByCredentialType("gmailOAuth2Api");
- * // Returns: Gmail node
- * ```
- */
-export function getNodesByCredentialType(
-  credentialType: string,
-): NodeDefinition[] {
-  return NODE_CATALOG.filter((node) =>
-    node.credentials?.some((cred) => cred.name === credentialType),
-  );
 }
