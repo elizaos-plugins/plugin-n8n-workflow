@@ -1,4 +1,4 @@
-import { type IAgentRuntime, logger } from "@elizaos/core";
+import { type IAgentRuntime, logger } from '@elizaos/core';
 import {
   N8nWorkflow,
   OAuthService,
@@ -8,8 +8,8 @@ import {
   N8nPluginConfig,
   N8nCredentialSchema,
   UserTokens,
-} from "../types/index";
-import { N8nApiClient } from "./api";
+} from '../types/index';
+import { N8nApiClient } from './api';
 
 /**
  * Resolve and inject credentials into workflow
@@ -35,7 +35,7 @@ export async function resolveCredentials(
     };
   }
 
-  const oauthService = runtime.getService("oauth");
+  const oauthService = runtime.getService('oauth');
   const hasOAuthService = oauthService && isOAuthService(oauthService);
 
   const injectedCredentials = new Map<string, string>();
@@ -88,9 +88,9 @@ function extractRequiredCredentialTypes(workflow: N8nWorkflow): Set<string> {
 
 function getProviderName(credType: string): string {
   return credType
-    .replace(/OAuth2Api$/, "")
-    .replace(/Api$/, "")
-    .replace(/TokenApi$/, "")
+    .replace(/OAuth2Api$/, '')
+    .replace(/Api$/, '')
+    .replace(/TokenApi$/, '')
     .toLowerCase();
 }
 
@@ -145,7 +145,7 @@ async function resolveWithOAuth(
     return credential.id;
   } catch (error) {
     logger.error(
-      { src: "plugin:n8n-workflow:utils:credentials" },
+      { src: 'plugin:n8n-workflow:utils:credentials' },
       `Failed to create credential for ${credType}: ${error instanceof Error ? error.message : String(error)}`,
     );
     missingConnections.push({ credType });
@@ -164,7 +164,7 @@ function buildCredentialData(
     data.oauthTokenData = {
       access_token: tokens.accessToken,
       refresh_token: tokens.refreshToken,
-      token_type: tokens.tokenType || "Bearer",
+      token_type: tokens.tokenType || 'Bearer',
       expires_in: tokens.expiresIn || 3600,
       scope: appConfig?.scope || tokens.scope,
     };
@@ -195,9 +195,9 @@ function buildCredentialData(
   for (const [field, fieldSchema] of Object.entries(schema.properties)) {
     if (
       data[field] === undefined &&
-      typeof fieldSchema === "object" &&
+      typeof fieldSchema === 'object' &&
       fieldSchema !== null &&
-      "default" in fieldSchema &&
+      'default' in fieldSchema &&
       fieldSchema.default !== undefined
     ) {
       data[field] = fieldSchema.default;
@@ -248,9 +248,9 @@ export function getMissingCredentials(workflow: N8nWorkflow): string[] {
     if (node.credentials) {
       for (const [credType, credRef] of Object.entries(node.credentials)) {
         if (
-          typeof credRef === "object" &&
-          "id" in credRef &&
-          credRef.id === "PLACEHOLDER"
+          typeof credRef === 'object' &&
+          'id' in credRef &&
+          credRef.id === 'PLACEHOLDER'
         ) {
           missing.add(credType);
         }

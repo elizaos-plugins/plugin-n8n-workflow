@@ -1,2 +1,2 @@
-export { workflowStatusProvider } from "./workflowStatus";
-export { activeWorkflowsProvider } from "./activeWorkflows";
+export { workflowStatusProvider } from './workflowStatus';
+export { activeWorkflowsProvider } from './activeWorkflows';

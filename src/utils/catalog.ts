@@ -1,5 +1,5 @@
-import { NodeDefinition, NodeSearchResult } from "../types/index";
-import defaultNodesData from "../data/defaultNodes.json" assert { type: "json" };
+import { NodeDefinition, NodeSearchResult } from '../types/index';
+import defaultNodesData from '../data/defaultNodes.json' assert { type: 'json' };
 
 /**
  * n8n node catalog with keyword-based search
@@ -49,7 +49,7 @@ export function searchNodes(
 
     const nodeName = node.name.toLowerCase();
     const nodeDisplayName = node.displayName.toLowerCase();
-    const nodeDescription = node.description?.toLowerCase() || "";
+    const nodeDescription = node.description?.toLowerCase() || '';
 
     for (const keyword of normalizedKeywords) {
       // Exact name match (highest priority)
@@ -87,7 +87,7 @@ export function searchNodes(
     return {
       node,
       score,
-      matchReason: matchReasons.join(", ") || "no strong match",
+      matchReason: matchReasons.join(', ') || 'no strong match',
     };
   });
 

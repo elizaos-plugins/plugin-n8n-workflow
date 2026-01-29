@@ -7,40 +7,40 @@ import {
   logger,
   type Memory,
   type State,
-} from "@elizaos/core";
+} from '@elizaos/core';
 import {
   N8N_WORKFLOW_SERVICE_TYPE,
   type N8nWorkflowService,
-} from "../services/index";
+} from '../services/index';
 
 const examples: ActionExample[][] = [
   [
     {
-      name: "{{user1}}",
+      name: '{{user1}}',
       content: {
-        text: "Run workflow abc123 manually",
+        text: 'Run workflow abc123 manually',
       },
     },
     {
-      name: "{{agent}}",
+      name: '{{agent}}',
       content: {
         text: "I'll execute that workflow for you.",
-        actions: ["EXECUTE_N8N_WORKFLOW"],
+        actions: ['EXECUTE_N8N_WORKFLOW'],
       },
     },
   ],
 ];
 
 export const executeWorkflowAction: Action = {
-  name: "EXECUTE_N8N_WORKFLOW",
+  name: 'EXECUTE_N8N_WORKFLOW',
   similes: [
-    "EXECUTE_WORKFLOW",
-    "RUN_WORKFLOW",
-    "TRIGGER_WORKFLOW",
-    "MANUAL_RUN_WORKFLOW",
+    'EXECUTE_WORKFLOW',
+    'RUN_WORKFLOW',
+    'TRIGGER_WORKFLOW',
+    'MANUAL_RUN_WORKFLOW',
   ],
   description:
-    "Manually execute an n8n workflow. Runs the workflow immediately, regardless of triggers.",
+    'Manually execute an n8n workflow. Runs the workflow immediately, regardless of triggers.',
 
   validate: async (runtime: IAgentRuntime): Promise<boolean> => {
     return !!runtime.getService(N8N_WORKFLOW_SERVICE_TYPE);
@@ -59,24 +59,24 @@ export const executeWorkflowAction: Action = {
 
     if (!service) {
       logger.error(
-        { src: "plugin:n8n-workflow:action:execute" },
-        "N8n Workflow service not available",
+        { src: 'plugin:n8n-workflow:action:execute' },
+        'N8n Workflow service not available',
       );
       if (callback) {
         await callback({
-          text: "N8n Workflow service is not available.",
+          text: 'N8n Workflow service is not available.',
         });
       }
       return { success: false };
     }
 
     try {
-      const workflowId = (state?.workflowId as string) || "";
+      const workflowId = (state?.workflowId as string) || '';
 
       if (!workflowId) {
         if (callback) {
           await callback({
-            text: "Please provide a workflow ID.",
+            text: 'Please provide a workflow ID.',
           });
         }
         return { success: false };
@@ -85,7 +85,7 @@ export const executeWorkflowAction: Action = {
       const execution = await service.executeWorkflow(workflowId);
 
       logger.info(
-        { src: "plugin:n8n-workflow:action:execute" },
+        { src: 'plugin:n8n-workflow:action:execute' },
         `Executed workflow ${workflowId}, execution ID: ${execution.id}`,
       );
 
@@ -101,9 +101,9 @@ export const executeWorkflowAction: Action = {
       };
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
+        error instanceof Error ? error.message : 'Unknown error';
       logger.error(
-        { src: "plugin:n8n-workflow:action:execute" },
+        { src: 'plugin:n8n-workflow:action:execute' },
         `Failed to execute workflow: ${errorMessage}`,
       );
 

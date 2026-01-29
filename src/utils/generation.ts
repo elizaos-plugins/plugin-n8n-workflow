@@ -1,19 +1,19 @@
-import { type IAgentRuntime, ModelType, logger } from "@elizaos/core";
+import { type IAgentRuntime, ModelType, logger } from '@elizaos/core';
 import {
   KeywordExtractionResult,
   N8nWorkflow,
   WorkflowMatchResult,
   NodeDefinition,
-} from "../types/index";
+} from '../types/index';
 import {
   KEYWORD_EXTRACTION_SYSTEM_PROMPT,
   WORKFLOW_GENERATION_SYSTEM_PROMPT,
-} from "../prompts/index";
-import { WORKFLOW_MATCHING_SYSTEM_PROMPT } from "../prompts/workflowMatching";
+} from '../prompts/index';
+import { WORKFLOW_MATCHING_SYSTEM_PROMPT } from '../prompts/workflowMatching';
 import {
   keywordExtractionSchema,
   workflowMatchingSchema,
-} from "../schemas/index";
+} from '../schemas/index';
 
 /**
  * Extracts keywords from user prompt using LLM
@@ -41,13 +41,13 @@ export async function extractKeywords(
   // Validate structure
   if (!result || !result.keywords || !Array.isArray(result.keywords)) {
     throw new Error(
-      "Invalid keyword extraction response: missing or invalid keywords array",
+      'Invalid keyword extraction response: missing or invalid keywords array',
     );
   }
 
   // Validate all items are strings
-  if (!result.keywords.every((kw) => typeof kw === "string")) {
-    throw new Error("Keywords array contains non-string elements");
+  if (!result.keywords.every((kw) => typeof kw === 'string')) {
+    throw new Error('Keywords array contains non-string elements');
   }
 
   // Limit to 5 keywords max, filter empty strings
@@ -73,9 +73,9 @@ export async function matchWorkflow(
   if (workflows.length === 0) {
     return {
       matchedWorkflowId: null,
-      confidence: "none",
+      confidence: 'none',
       matches: [],
-      reason: "No workflows available",
+      reason: 'No workflows available',
     };
   }
 
@@ -84,9 +84,9 @@ export async function matchWorkflow(
     const workflowList = workflows
       .map(
         (wf, index) =>
-          `${index + 1}. "${wf.name}" (ID: ${wf.id}, Status: ${wf.active ? "ACTIVE" : "INACTIVE"})`,
+          `${index + 1}. "${wf.name}" (ID: ${wf.id}, Status: ${wf.active ? 'ACTIVE' : 'INACTIVE'})`,
       )
-      .join("\n");
+      .join('\n');
 
     const userPrompt = `${userRequest}
 
@@ -101,21 +101,21 @@ ${workflowList}`;
     const result = response as unknown as WorkflowMatchResult;
 
     logger.debug(
-      { src: "plugin:n8n-workflow:generation:matcher" },
-      `Workflow match: ${result.matchedWorkflowId || "none"} (confidence: ${result.confidence})`,
+      { src: 'plugin:n8n-workflow:generation:matcher' },
+      `Workflow match: ${result.matchedWorkflowId || 'none'} (confidence: ${result.confidence})`,
     );
 
     return result;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error(
-      { src: "plugin:n8n-workflow:generation:matcher" },
+      { src: 'plugin:n8n-workflow:generation:matcher' },
       `Workflow matching failed: ${errorMessage}`,
     );
 
     return {
       matchedWorkflowId: null,
-      confidence: "none",
+      confidence: 'none',
       matches: [],
       reason: `Workflow matching service unavailable: ${errorMessage}`,
     };
@@ -164,7 +164,7 @@ Generate a valid n8n workflow JSON that fulfills this request.`;
   const response = await runtime.useModel(ModelType.TEXT_LARGE, {
     prompt: fullPrompt,
     temperature: 0,
-    responseFormat: { type: "json_object" },
+    responseFormat: { type: 'json_object' },
   });
 
   // Parse workflow JSON
@@ -172,9 +172,9 @@ Generate a valid n8n workflow JSON that fulfills this request.`;
   try {
     // Remove markdown code fences if present
     const cleanedResponse = response
-      .replace(/^```json\s*/i, "")
-      .replace(/^```\s*/i, "")
-      .replace(/```\s*$/, "")
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/```\s*$/, '')
       .trim();
 
     workflow = JSON.parse(cleanedResponse) as N8nWorkflow;
@@ -186,11 +186,11 @@ Generate a valid n8n workflow JSON that fulfills this request.`;
 
   // Basic validation
   if (!workflow.nodes || !Array.isArray(workflow.nodes)) {
-    throw new Error("Invalid workflow: missing or invalid nodes array");
+    throw new Error('Invalid workflow: missing or invalid nodes array');
   }
 
-  if (!workflow.connections || typeof workflow.connections !== "object") {
-    throw new Error("Invalid workflow: missing or invalid connections object");
+  if (!workflow.connections || typeof workflow.connections !== 'object') {
+    throw new Error('Invalid workflow: missing or invalid connections object');
   }
 
   return workflow;
