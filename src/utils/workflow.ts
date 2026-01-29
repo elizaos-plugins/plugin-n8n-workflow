@@ -1,8 +1,4 @@
-import {
-  N8nWorkflow,
-  WorkflowValidationResult,
-  WorkflowValidationError,
-} from '../types/index';
+import { N8nWorkflow, WorkflowValidationResult, WorkflowValidationError } from '../types/index';
 
 /**
  * Validate workflow structure and auto-fix common issues
@@ -10,9 +6,7 @@ import {
  * @param workflow - Generated workflow to validate
  * @returns Validation result with errors, warnings, and optionally fixed workflow
  */
-export function validateWorkflow(
-  workflow: N8nWorkflow,
-): WorkflowValidationResult {
+export function validateWorkflow(workflow: N8nWorkflow): WorkflowValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
   let needsFix = false;
@@ -58,11 +52,7 @@ export function validateWorkflow(
     nodeMap.set(node.name, node);
 
     // Check position
-    if (
-      !node.position ||
-      !Array.isArray(node.position) ||
-      node.position.length !== 2
-    ) {
+    if (!node.position || !Array.isArray(node.position) || node.position.length !== 2) {
       warnings.push(`Node "${node.name}" has invalid position, will auto-fix`);
       needsFix = true;
     }
@@ -76,9 +66,7 @@ export function validateWorkflow(
   // 4. Validate connections reference existing nodes
   for (const [sourceName, outputs] of Object.entries(workflow.connections)) {
     if (!nodeNames.has(sourceName)) {
-      errors.push(
-        `Connection references non-existent source node: "${sourceName}"`,
-      );
+      errors.push(`Connection references non-existent source node: "${sourceName}"`);
       continue;
     }
 
@@ -101,7 +89,7 @@ export function validateWorkflow(
 
           if (!nodeNames.has(connection.node)) {
             errors.push(
-              `Connection references non-existent target node: "${connection.node}" (from "${sourceName}")`,
+              `Connection references non-existent target node: "${connection.node}" (from "${sourceName}")`
             );
           }
         }
@@ -114,13 +102,11 @@ export function validateWorkflow(
     (node) =>
       node.type.toLowerCase().includes('trigger') ||
       node.type.toLowerCase().includes('webhook') ||
-      node.name.toLowerCase().includes('start'),
+      node.name.toLowerCase().includes('start')
   );
 
   if (!hasTrigger) {
-    warnings.push(
-      'Workflow has no trigger node - it can only be executed manually',
-    );
+    warnings.push('Workflow has no trigger node - it can only be executed manually');
   }
 
   // 6. Check for orphan nodes (nodes with no incoming connections, except triggers)
@@ -142,9 +128,7 @@ export function validateWorkflow(
       node.name.toLowerCase().includes('start');
 
     if (!isTrigger && !nodesWithIncoming.has(node.name)) {
-      warnings.push(
-        `Node "${node.name}" has no incoming connections - it will never execute`,
-      );
+      warnings.push(`Node "${node.name}" has no incoming connections - it will never execute`);
     }
   }
 
@@ -187,11 +171,7 @@ function autoFixWorkflow(workflow: N8nWorkflow): N8nWorkflow {
     const node = { ...fixed.nodes[i] };
 
     // Fix missing or invalid position
-    if (
-      !node.position ||
-      !Array.isArray(node.position) ||
-      node.position.length !== 2
-    ) {
+    if (!node.position || !Array.isArray(node.position) || node.position.length !== 2) {
       node.position = [x, y];
       x += xSpacing;
     }
@@ -212,7 +192,7 @@ export function validateWorkflowOrThrow(workflow: N8nWorkflow): N8nWorkflow {
   if (!result.valid) {
     throw new WorkflowValidationError(
       `Workflow validation failed: ${result.errors.join(', ')}`,
-      result.errors,
+      result.errors
     );
   }
 
@@ -244,7 +224,7 @@ export function positionNodes(workflow: N8nWorkflow): N8nWorkflow {
       Array.isArray(node.position) &&
       node.position.length === 2 &&
       typeof node.position[0] === 'number' &&
-      typeof node.position[1] === 'number',
+      typeof node.position[1] === 'number'
   );
 
   if (allHavePositions) {
@@ -297,7 +277,7 @@ function buildNodeGraph(workflow: N8nWorkflow): Map<string, string[]> {
  */
 function positionByLevels(
   nodes: N8nWorkflow['nodes'],
-  graph: Map<string, string[]>,
+  graph: Map<string, string[]>
 ): N8nWorkflow['nodes'] {
   // Find trigger/start nodes (nodes with no incoming connections)
   const incomingCount = new Map<string, number>();
@@ -311,9 +291,7 @@ function positionByLevels(
     }
   }
 
-  const triggerNodes = nodes.filter(
-    (node) => incomingCount.get(node.name) === 0,
-  );
+  const triggerNodes = nodes.filter((node) => incomingCount.get(node.name) === 0);
 
   // Organize into levels
   const levels: string[][] = [];

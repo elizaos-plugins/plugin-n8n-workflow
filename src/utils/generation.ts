@@ -10,10 +10,7 @@ import {
   WORKFLOW_GENERATION_SYSTEM_PROMPT,
 } from '../prompts/index';
 import { WORKFLOW_MATCHING_SYSTEM_PROMPT } from '../prompts/workflowMatching';
-import {
-  keywordExtractionSchema,
-  workflowMatchingSchema,
-} from '../schemas/index';
+import { keywordExtractionSchema, workflowMatchingSchema } from '../schemas/index';
 
 /**
  * Extracts keywords from user prompt using LLM
@@ -31,7 +28,7 @@ import {
  */
 export async function extractKeywords(
   runtime: IAgentRuntime,
-  userPrompt: string,
+  userPrompt: string
 ): Promise<string[]> {
   const result = (await runtime.useModel(ModelType.OBJECT_SMALL, {
     prompt: `${KEYWORD_EXTRACTION_SYSTEM_PROMPT}\n\nUser request: ${userPrompt}`,
@@ -40,9 +37,7 @@ export async function extractKeywords(
 
   // Validate structure
   if (!result || !result.keywords || !Array.isArray(result.keywords)) {
-    throw new Error(
-      'Invalid keyword extraction response: missing or invalid keywords array',
-    );
+    throw new Error('Invalid keyword extraction response: missing or invalid keywords array');
   }
 
   // Validate all items are strings
@@ -68,7 +63,7 @@ export async function extractKeywords(
 export async function matchWorkflow(
   runtime: IAgentRuntime,
   userRequest: string,
-  workflows: N8nWorkflow[],
+  workflows: N8nWorkflow[]
 ): Promise<WorkflowMatchResult> {
   if (workflows.length === 0) {
     return {
@@ -84,7 +79,7 @@ export async function matchWorkflow(
     const workflowList = workflows
       .map(
         (wf, index) =>
-          `${index + 1}. "${wf.name}" (ID: ${wf.id}, Status: ${wf.active ? 'ACTIVE' : 'INACTIVE'})`,
+          `${index + 1}. "${wf.name}" (ID: ${wf.id}, Status: ${wf.active ? 'ACTIVE' : 'INACTIVE'})`
       )
       .join('\n');
 
@@ -102,7 +97,7 @@ ${workflowList}`;
 
     logger.debug(
       { src: 'plugin:n8n-workflow:generation:matcher' },
-      `Workflow match: ${result.matchedWorkflowId || 'none'} (confidence: ${result.confidence})`,
+      `Workflow match: ${result.matchedWorkflowId || 'none'} (confidence: ${result.confidence})`
     );
 
     return result;
@@ -110,7 +105,7 @@ ${workflowList}`;
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error(
       { src: 'plugin:n8n-workflow:generation:matcher' },
-      `Workflow matching failed: ${errorMessage}`,
+      `Workflow matching failed: ${errorMessage}`
     );
 
     return {
@@ -143,7 +138,7 @@ ${workflowList}`;
 export async function generateWorkflow(
   runtime: IAgentRuntime,
   userPrompt: string,
-  relevantNodes: NodeDefinition[],
+  relevantNodes: NodeDefinition[]
 ): Promise<N8nWorkflow> {
   // Build full prompt with system instructions + relevant nodes + user request
   const fullPrompt = `${WORKFLOW_GENERATION_SYSTEM_PROMPT}
@@ -180,7 +175,7 @@ Generate a valid n8n workflow JSON that fulfills this request.`;
     workflow = JSON.parse(cleanedResponse) as N8nWorkflow;
   } catch (error) {
     throw new Error(
-      `Failed to parse workflow JSON: ${error instanceof Error ? error.message : String(error)}\n\nRaw response: ${response}`,
+      `Failed to parse workflow JSON: ${error instanceof Error ? error.message : String(error)}\n\nRaw response: ${response}`
     );
   }
 

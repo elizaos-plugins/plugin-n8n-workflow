@@ -60,7 +60,7 @@ export class N8nApiClient {
 
     return this.request<{ data: N8nWorkflowResponse[]; nextCursor?: string }>(
       'GET',
-      `/workflows${query.toString() ? `?${query.toString()}` : ''}`,
+      `/workflows${query.toString() ? `?${query.toString()}` : ''}`
     );
   }
 
@@ -76,15 +76,8 @@ export class N8nApiClient {
    * Update a workflow
    * @see PUT /workflows/{id}
    */
-  async updateWorkflow(
-    id: string,
-    workflow: Partial<N8nWorkflow>,
-  ): Promise<N8nWorkflowResponse> {
-    return this.request<N8nWorkflowResponse>(
-      'PUT',
-      `/workflows/${id}`,
-      workflow,
-    );
+  async updateWorkflow(id: string, workflow: Partial<N8nWorkflow>): Promise<N8nWorkflowResponse> {
+    return this.request<N8nWorkflowResponse>('PUT', `/workflows/${id}`, workflow);
   }
 
   /**
@@ -100,10 +93,7 @@ export class N8nApiClient {
    * @see POST /workflows/{id}/activate
    */
   async activateWorkflow(id: string): Promise<N8nWorkflowResponse> {
-    return this.request<N8nWorkflowResponse>(
-      'POST',
-      `/workflows/${id}/activate`,
-    );
+    return this.request<N8nWorkflowResponse>('POST', `/workflows/${id}/activate`);
   }
 
   /**
@@ -111,10 +101,7 @@ export class N8nApiClient {
    * @see POST /workflows/{id}/deactivate
    */
   async deactivateWorkflow(id: string): Promise<N8nWorkflowResponse> {
-    return this.request<N8nWorkflowResponse>(
-      'POST',
-      `/workflows/${id}/deactivate`,
-    );
+    return this.request<N8nWorkflowResponse>('POST', `/workflows/${id}/deactivate`);
   }
 
   /**
@@ -129,10 +116,7 @@ export class N8nApiClient {
    * Update workflow tags
    * @see PUT /workflows/{id}/tags
    */
-  async updateWorkflowTags(
-    id: string,
-    tagIds: string[],
-  ): Promise<N8nWorkflowResponse> {
+  async updateWorkflowTags(id: string, tagIds: string[]): Promise<N8nWorkflowResponse> {
     return this.request<N8nWorkflowResponse>('PUT', `/workflows/${id}/tags`, {
       tags: tagIds,
     });
@@ -158,9 +142,7 @@ export class N8nApiClient {
    * List credentials (filtered by type if provided)
    * @see GET /credentials
    */
-  async listCredentials(params?: {
-    type?: string;
-  }): Promise<{ data: N8nCredential[] }> {
+  async listCredentials(params?: { type?: string }): Promise<{ data: N8nCredential[] }> {
     const query = new URLSearchParams();
     if (params?.type) {
       query.append('type', params.type);
@@ -168,7 +150,7 @@ export class N8nApiClient {
 
     return this.request<{ data: N8nCredential[] }>(
       'GET',
-      `/credentials${query.toString() ? `?${query.toString()}` : ''}`,
+      `/credentials${query.toString() ? `?${query.toString()}` : ''}`
     );
   }
 
@@ -177,10 +159,7 @@ export class N8nApiClient {
    * @see GET /credentials/schema/{type}
    */
   async getCredentialSchema(type: string): Promise<N8nCredentialSchema> {
-    return this.request<N8nCredentialSchema>(
-      'GET',
-      `/credentials/schema/${type}`,
-    );
+    return this.request<N8nCredentialSchema>('GET', `/credentials/schema/${type}`);
   }
 
   /**
@@ -221,7 +200,7 @@ export class N8nApiClient {
 
     return this.request<{ data: N8nExecution[]; nextCursor?: string }>(
       'GET',
-      `/executions${query.toString() ? `?${query.toString()}` : ''}`,
+      `/executions${query.toString() ? `?${query.toString()}` : ''}`
     );
   }
 
@@ -267,9 +246,7 @@ export class N8nApiClient {
    */
   async getOrCreateTag(name: string): Promise<N8nTag> {
     const { data: tags } = await this.listTags();
-    const existing = tags.find(
-      (tag) => tag.name.toLowerCase() === name.toLowerCase(),
-    );
+    const existing = tags.find((tag) => tag.name.toLowerCase() === name.toLowerCase());
     if (existing) {
       return existing;
     }
@@ -283,11 +260,7 @@ export class N8nApiClient {
   /**
    * Generic request handler with error handling
    */
-  private async request<T = void>(
-    method: string,
-    path: string,
-    body?: unknown,
-  ): Promise<T> {
+  private async request<T = void>(method: string, path: string, body?: unknown): Promise<T> {
     const url = `${this.baseUrl}/api/v1${path}`;
 
     const options: RequestInit = {
@@ -329,7 +302,7 @@ export class N8nApiClient {
         throw new N8nApiError(
           data.message || `n8n API error: ${response.statusText}`,
           response.status,
-          data,
+          data
         );
       }
 
@@ -343,7 +316,7 @@ export class N8nApiClient {
       throw new N8nApiError(
         `Failed to call n8n API: ${error instanceof Error ? error.message : String(error)}`,
         undefined,
-        error,
+        error
       );
     }
   }

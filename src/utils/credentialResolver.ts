@@ -23,7 +23,7 @@ export async function resolveCredentials(
   userId: string,
   runtime: IAgentRuntime,
   apiClient: N8nApiClient,
-  config: N8nPluginConfig,
+  config: N8nPluginConfig
 ): Promise<CredentialResolutionResult> {
   const requiredCredTypes = extractRequiredCredentialTypes(workflow);
 
@@ -50,7 +50,7 @@ export async function resolveCredentials(
         userId,
         oauthService as OAuthService,
         apiClient,
-        missingConnections,
+        missingConnections
       );
     } else if (config.credentials?.[credType]) {
       credId = config.credentials[credType];
@@ -99,7 +99,7 @@ async function resolveWithOAuth(
   userId: string,
   oauthService: OAuthService,
   apiClient: N8nApiClient,
-  missingConnections: MissingConnection[],
+  missingConnections: MissingConnection[]
 ): Promise<string | null> {
   const existingCredId = await oauthService.getN8nCredId(userId, credType);
   if (existingCredId) {
@@ -108,11 +108,7 @@ async function resolveWithOAuth(
 
   const hasConnection = await oauthService.hasConnection(userId, credType);
   if (!hasConnection) {
-    const oauthUrl = await oauthService.getAuthUrl(
-      userId,
-      getProviderName(credType),
-      [],
-    );
+    const oauthUrl = await oauthService.getAuthUrl(userId, getProviderName(credType), []);
 
     missingConnections.push({
       credType,
@@ -129,9 +125,7 @@ async function resolveWithOAuth(
     }
 
     const schema = await apiClient.getCredentialSchema(credType);
-    const appConfig = await oauthService.getOAuthAppConfig?.(
-      getProviderName(credType),
-    );
+    const appConfig = await oauthService.getOAuthAppConfig?.(getProviderName(credType));
     const credData = buildCredentialData(schema, tokens, appConfig);
 
     const credential = await apiClient.createCredential({
@@ -146,7 +140,7 @@ async function resolveWithOAuth(
   } catch (error) {
     logger.error(
       { src: 'plugin:n8n-workflow:utils:credentials' },
-      `Failed to create credential for ${credType}: ${error instanceof Error ? error.message : String(error)}`,
+      `Failed to create credential for ${credType}: ${error instanceof Error ? error.message : String(error)}`
     );
     missingConnections.push({ credType });
     return null;
@@ -156,7 +150,7 @@ async function resolveWithOAuth(
 function buildCredentialData(
   schema: N8nCredentialSchema,
   tokens: UserTokens,
-  appConfig?: { clientId: string; clientSecret: string; scope?: string },
+  appConfig?: { clientId: string; clientSecret: string; scope?: string }
 ): Record<string, unknown> {
   const data: Record<string, unknown> = {};
 
@@ -209,7 +203,7 @@ function buildCredentialData(
 
 function injectCredentialIds(
   workflow: N8nWorkflow,
-  credentialMap: Map<string, string>,
+  credentialMap: Map<string, string>
 ): N8nWorkflow {
   const injected = { ...workflow };
   injected.nodes = workflow.nodes.map((node) => {
@@ -247,11 +241,7 @@ export function getMissingCredentials(workflow: N8nWorkflow): string[] {
   for (const node of workflow.nodes || []) {
     if (node.credentials) {
       for (const [credType, credRef] of Object.entries(node.credentials)) {
-        if (
-          typeof credRef === 'object' &&
-          'id' in credRef &&
-          credRef.id === 'PLACEHOLDER'
-        ) {
+        if (typeof credRef === 'object' && 'id' in credRef && credRef.id === 'PLACEHOLDER') {
           missing.add(credType);
         }
       }

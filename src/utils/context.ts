@@ -8,7 +8,7 @@ import { type IAgentRuntime, type Memory, type State } from '@elizaos/core';
 export function buildConversationContext(
   runtime: IAgentRuntime,
   message: Memory,
-  state: State | undefined,
+  state: State | undefined
 ): string {
   const recentMessages = (state?.data?.recentMessages as Memory[]) || [];
 
@@ -18,10 +18,7 @@ export function buildConversationContext(
 
   const context = recentMessages
     .slice(-5)
-    .map(
-      (m) =>
-        `${m.entityId === runtime.agentId ? 'Assistant' : 'User'}: ${m.content.text}`,
-    )
+    .map((m) => `${m.entityId === runtime.agentId ? 'Assistant' : 'User'}: ${m.content.text}`)
     .join('\n');
 
   return `Recent conversation:\n${context}\n\nCurrent request: ${message.content.text || ''}`;

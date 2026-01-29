@@ -8,10 +8,7 @@ import {
   type Memory,
   type State,
 } from '@elizaos/core';
-import {
-  N8N_WORKFLOW_SERVICE_TYPE,
-  type N8nWorkflowService,
-} from '../services/index';
+import { N8N_WORKFLOW_SERVICE_TYPE, type N8nWorkflowService } from '../services/index';
 
 const examples: ActionExample[][] = [
   [
@@ -53,16 +50,14 @@ export const listCredentialsAction: Action = {
     message: Memory,
     _state: State | undefined,
     _options?: unknown,
-    callback?: HandlerCallback,
+    callback?: HandlerCallback
   ): Promise<ActionResult> => {
-    const service = runtime.getService<N8nWorkflowService>(
-      N8N_WORKFLOW_SERVICE_TYPE,
-    );
+    const service = runtime.getService<N8nWorkflowService>(N8N_WORKFLOW_SERVICE_TYPE);
 
     if (!service) {
       logger.error(
         { src: 'plugin:n8n-workflow:action:list-credentials' },
-        'N8n Workflow service not available',
+        'N8n Workflow service not available'
       );
       if (callback) {
         await callback({
@@ -77,7 +72,7 @@ export const listCredentialsAction: Action = {
 
       logger.info(
         { src: 'plugin:n8n-workflow:action:list-credentials' },
-        `Retrieved ${credentials.length} credentials`,
+        `Retrieved ${credentials.length} credentials`
       );
 
       if (credentials.length === 0) {
@@ -126,11 +121,10 @@ export const listCredentialsAction: Action = {
         data: { credentials },
       };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error(
         { src: 'plugin:n8n-workflow:action:list-credentials' },
-        `Failed to list credentials: ${errorMessage}`,
+        `Failed to list credentials: ${errorMessage}`
       );
 
       if (callback) {

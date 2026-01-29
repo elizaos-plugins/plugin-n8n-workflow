@@ -8,10 +8,7 @@ import {
   type Memory,
   type State,
 } from '@elizaos/core';
-import {
-  N8N_WORKFLOW_SERVICE_TYPE,
-  type N8nWorkflowService,
-} from '../services/index';
+import { N8N_WORKFLOW_SERVICE_TYPE, type N8nWorkflowService } from '../services/index';
 
 const examples: ActionExample[][] = [
   [
@@ -33,12 +30,7 @@ const examples: ActionExample[][] = [
 
 export const executeWorkflowAction: Action = {
   name: 'EXECUTE_N8N_WORKFLOW',
-  similes: [
-    'EXECUTE_WORKFLOW',
-    'RUN_WORKFLOW',
-    'TRIGGER_WORKFLOW',
-    'MANUAL_RUN_WORKFLOW',
-  ],
+  similes: ['EXECUTE_WORKFLOW', 'RUN_WORKFLOW', 'TRIGGER_WORKFLOW', 'MANUAL_RUN_WORKFLOW'],
   description:
     'Manually execute an n8n workflow. Runs the workflow immediately, regardless of triggers.',
 
@@ -51,16 +43,14 @@ export const executeWorkflowAction: Action = {
     message: Memory,
     state: State | undefined,
     _options?: unknown,
-    callback?: HandlerCallback,
+    callback?: HandlerCallback
   ): Promise<ActionResult> => {
-    const service = runtime.getService<N8nWorkflowService>(
-      N8N_WORKFLOW_SERVICE_TYPE,
-    );
+    const service = runtime.getService<N8nWorkflowService>(N8N_WORKFLOW_SERVICE_TYPE);
 
     if (!service) {
       logger.error(
         { src: 'plugin:n8n-workflow:action:execute' },
-        'N8n Workflow service not available',
+        'N8n Workflow service not available'
       );
       if (callback) {
         await callback({
@@ -86,7 +76,7 @@ export const executeWorkflowAction: Action = {
 
       logger.info(
         { src: 'plugin:n8n-workflow:action:execute' },
-        `Executed workflow ${workflowId}, execution ID: ${execution.id}`,
+        `Executed workflow ${workflowId}, execution ID: ${execution.id}`
       );
 
       if (callback) {
@@ -100,11 +90,10 @@ export const executeWorkflowAction: Action = {
         data: { execution },
       };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error(
         { src: 'plugin:n8n-workflow:action:execute' },
-        `Failed to execute workflow: ${errorMessage}`,
+        `Failed to execute workflow: ${errorMessage}`
       );
 
       if (callback) {

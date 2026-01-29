@@ -8,10 +8,7 @@ import {
   type Memory,
   type State,
 } from '@elizaos/core';
-import {
-  N8N_WORKFLOW_SERVICE_TYPE,
-  type N8nWorkflowService,
-} from '../services/index';
+import { N8N_WORKFLOW_SERVICE_TYPE, type N8nWorkflowService } from '../services/index';
 import { matchWorkflow } from '../utils/generation';
 import { buildConversationContext } from '../utils/context';
 import type { N8nWorkflow } from '../types/index';
@@ -66,12 +63,7 @@ const examples: ActionExample[][] = [
 
 export const activateWorkflowAction: Action = {
   name: 'ACTIVATE_N8N_WORKFLOW',
-  similes: [
-    'ACTIVATE_WORKFLOW',
-    'ENABLE_WORKFLOW',
-    'START_WORKFLOW',
-    'TURN_ON_WORKFLOW',
-  ],
+  similes: ['ACTIVATE_WORKFLOW', 'ENABLE_WORKFLOW', 'START_WORKFLOW', 'TURN_ON_WORKFLOW'],
   description:
     'Activate an n8n workflow to start processing triggers and running automatically. Identifies workflows by ID, name, or semantic description in any language.',
 
@@ -85,16 +77,14 @@ export const activateWorkflowAction: Action = {
     message: Memory,
     state: State | undefined,
     _options?: unknown,
-    callback?: HandlerCallback,
+    callback?: HandlerCallback
   ): Promise<ActionResult> => {
-    const service = runtime.getService<N8nWorkflowService>(
-      N8N_WORKFLOW_SERVICE_TYPE,
-    );
+    const service = runtime.getService<N8nWorkflowService>(N8N_WORKFLOW_SERVICE_TYPE);
 
     if (!service) {
       logger.error(
         { src: 'plugin:n8n-workflow:action:activate' },
-        'N8n Workflow service not available',
+        'N8n Workflow service not available'
       );
       if (callback) {
         await callback({
@@ -121,9 +111,7 @@ export const activateWorkflowAction: Action = {
       const matchResult = await matchWorkflow(runtime, context, workflows);
 
       if (!matchResult.matchedWorkflowId || matchResult.confidence === 'none') {
-        const workflowList = matchResult.matches
-          .map((m) => `- ${m.name} (ID: ${m.id})`)
-          .join('\n');
+        const workflowList = matchResult.matches.map((m) => `- ${m.name} (ID: ${m.id})`).join('\n');
 
         if (callback) {
           await callback({
@@ -137,7 +125,7 @@ export const activateWorkflowAction: Action = {
 
       logger.info(
         { src: 'plugin:n8n-workflow:action:activate' },
-        `Activated workflow ${matchResult.matchedWorkflowId}`,
+        `Activated workflow ${matchResult.matchedWorkflowId}`
       );
 
       if (callback) {
@@ -148,11 +136,10 @@ export const activateWorkflowAction: Action = {
 
       return { success: true };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error(
         { src: 'plugin:n8n-workflow:action:activate' },
-        `Failed to activate workflow: ${errorMessage}`,
+        `Failed to activate workflow: ${errorMessage}`
       );
 
       if (callback) {

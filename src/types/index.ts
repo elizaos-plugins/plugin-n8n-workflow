@@ -129,15 +129,7 @@ export interface N8nExecution {
   startedAt: string;
   stoppedAt?: string | null;
   workflowId: string;
-  status:
-    | 'canceled'
-    | 'crashed'
-    | 'error'
-    | 'new'
-    | 'running'
-    | 'success'
-    | 'unknown'
-    | 'waiting';
+  status: 'canceled' | 'crashed' | 'error' | 'new' | 'running' | 'success' | 'unknown' | 'waiting';
   waitTill?: string | null;
   customData?: Record<string, unknown>;
   data?: {
@@ -273,11 +265,7 @@ export type OAuthService = {
   /**
    * Generate OAuth URL for user to authorize app connection
    */
-  getAuthUrl(
-    userId: string,
-    provider: string,
-    scopes: string[],
-  ): Promise<string>;
+  getAuthUrl(userId: string, provider: string, scopes: string[]): Promise<string>;
 
   /**
    * Check if user has connected a specific app
@@ -395,7 +383,7 @@ export class N8nApiError extends Error {
   constructor(
     message: string,
     public statusCode?: number,
-    public response?: unknown,
+    public response?: unknown
   ) {
     super(message);
     this.name = 'N8nApiError';
@@ -405,7 +393,7 @@ export class N8nApiError extends Error {
 export class WorkflowValidationError extends Error {
   constructor(
     message: string,
-    public errors: string[],
+    public errors: string[]
   ) {
     super(message);
     this.name = 'WorkflowValidationError';
@@ -415,7 +403,7 @@ export class WorkflowValidationError extends Error {
 export class CredentialResolutionError extends Error {
   constructor(
     message: string,
-    public missingConnections: MissingConnection[],
+    public missingConnections: MissingConnection[]
   ) {
     super(message);
     this.name = 'CredentialResolutionError';

@@ -11,8 +11,4 @@ export { resolveCredentials } from './credentialResolver';
 export { extractKeywords, matchWorkflow, generateWorkflow } from './generation';
 
 // Workflow validation & positioning
-export {
-  validateWorkflow,
-  validateWorkflowOrThrow,
-  positionNodes,
-} from './workflow';
+export { validateWorkflow, validateWorkflowOrThrow, positionNodes } from './workflow';

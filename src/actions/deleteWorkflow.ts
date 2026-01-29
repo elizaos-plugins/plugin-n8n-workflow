@@ -8,10 +8,7 @@ import {
   type Memory,
   type State,
 } from '@elizaos/core';
-import {
-  N8N_WORKFLOW_SERVICE_TYPE,
-  type N8nWorkflowService,
-} from '../services/index';
+import { N8N_WORKFLOW_SERVICE_TYPE, type N8nWorkflowService } from '../services/index';
 import { matchWorkflow } from '../utils/generation';
 import { buildConversationContext } from '../utils/context';
 import type { N8nWorkflow } from '../types/index';
@@ -80,16 +77,14 @@ export const deleteWorkflowAction: Action = {
     message: Memory,
     state: State | undefined,
     _options?: unknown,
-    callback?: HandlerCallback,
+    callback?: HandlerCallback
   ): Promise<ActionResult> => {
-    const service = runtime.getService<N8nWorkflowService>(
-      N8N_WORKFLOW_SERVICE_TYPE,
-    );
+    const service = runtime.getService<N8nWorkflowService>(N8N_WORKFLOW_SERVICE_TYPE);
 
     if (!service) {
       logger.error(
         { src: 'plugin:n8n-workflow:action:delete' },
-        'N8n Workflow service not available',
+        'N8n Workflow service not available'
       );
       if (callback) {
         await callback({
@@ -115,9 +110,7 @@ export const deleteWorkflowAction: Action = {
       const matchResult = await matchWorkflow(runtime, context, workflows);
 
       if (!matchResult.matchedWorkflowId || matchResult.confidence === 'none') {
-        const workflowList = matchResult.matches
-          .map((m) => `- ${m.name} (ID: ${m.id})`)
-          .join('\n');
+        const workflowList = matchResult.matches.map((m) => `- ${m.name} (ID: ${m.id})`).join('\n');
 
         if (callback) {
           await callback({
@@ -131,7 +124,7 @@ export const deleteWorkflowAction: Action = {
 
       logger.info(
         { src: 'plugin:n8n-workflow:action:delete' },
-        `Deleted workflow ${matchResult.matchedWorkflowId}`,
+        `Deleted workflow ${matchResult.matchedWorkflowId}`
       );
 
       if (callback) {
@@ -142,11 +135,10 @@ export const deleteWorkflowAction: Action = {
 
       return { success: true };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error(
         { src: 'plugin:n8n-workflow:action:delete' },
-        `Failed to delete workflow: ${errorMessage}`,
+        `Failed to delete workflow: ${errorMessage}`
       );
 
       if (callback) {

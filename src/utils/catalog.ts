@@ -29,10 +29,7 @@ const NODE_CATALOG = defaultNodesData as NodeDefinition[];
  * // Returns Gmail node with high score, plus other email-related nodes
  * ```
  */
-export function searchNodes(
-  keywords: string[],
-  limit = 15,
-): NodeSearchResult[] {
+export function searchNodes(keywords: string[], limit = 15): NodeSearchResult[] {
   if (keywords.length === 0) {
     return [];
   }
@@ -42,7 +39,7 @@ export function searchNodes(
 
   // Score each node (skip entries with missing name/displayName)
   const scoredNodes: NodeSearchResult[] = NODE_CATALOG.filter(
-    (node) => node.name && node.displayName,
+    (node) => node.name && node.displayName
   ).map((node) => {
     let score = 0;
     const matchReasons: string[] = [];

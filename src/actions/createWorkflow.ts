@@ -9,10 +9,7 @@ import {
   type Memory,
   type State,
 } from '@elizaos/core';
-import {
-  N8N_WORKFLOW_SERVICE_TYPE,
-  type N8nWorkflowService,
-} from '../services/index';
+import { N8N_WORKFLOW_SERVICE_TYPE, type N8nWorkflowService } from '../services/index';
 
 const examples: ActionExample[][] = [
   [
@@ -88,16 +85,14 @@ export const createWorkflowAction: Action = {
     message: Memory,
     _state: State | undefined,
     _options?: unknown,
-    callback?: HandlerCallback,
+    callback?: HandlerCallback
   ): Promise<ActionResult> => {
-    const service = runtime.getService<N8nWorkflowService>(
-      N8N_WORKFLOW_SERVICE_TYPE,
-    );
+    const service = runtime.getService<N8nWorkflowService>(N8N_WORKFLOW_SERVICE_TYPE);
 
     if (!service) {
       logger.error(
         { src: 'plugin:n8n-workflow:action:create' },
-        'N8n Workflow service not available',
+        'N8n Workflow service not available'
       );
       if (callback) {
         await callback({
@@ -114,7 +109,7 @@ export const createWorkflowAction: Action = {
       if (!prompt) {
         logger.error(
           { src: 'plugin:n8n-workflow:action:create' },
-          'No prompt provided for workflow creation',
+          'No prompt provided for workflow creation'
         );
         if (callback) {
           await callback({
@@ -126,7 +121,7 @@ export const createWorkflowAction: Action = {
 
       logger.info(
         { src: 'plugin:n8n-workflow:action:create' },
-        `Creating workflow from prompt: ${prompt.slice(0, 100)}...`,
+        `Creating workflow from prompt: ${prompt.slice(0, 100)}...`
       );
 
       if (callback) {
@@ -136,14 +131,11 @@ export const createWorkflowAction: Action = {
       }
 
       // Create workflow using the service's RAG pipeline
-      const result = await service.createWorkflowFromPrompt(
-        prompt,
-        message.entityId,
-      );
+      const result = await service.createWorkflowFromPrompt(prompt, message.entityId);
 
       logger.info(
         { src: 'plugin:n8n-workflow:action:create' },
-        `Workflow created successfully: ${result.id} (${result.nodeCount} nodes)`,
+        `Workflow created successfully: ${result.id} (${result.nodeCount} nodes)`
       );
 
       // Build response message
@@ -161,8 +153,7 @@ export const createWorkflowAction: Action = {
         responseText +=
           '\nThe workflow will be ready to run once these connections are configured.';
       } else {
-        responseText +=
-          '\n✅ All credentials configured - workflow is ready to run!';
+        responseText += '\n✅ All credentials configured - workflow is ready to run!';
       }
 
       if (callback) {
@@ -176,11 +167,10 @@ export const createWorkflowAction: Action = {
         data: result,
       };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error(
         { src: 'plugin:n8n-workflow:action:create' },
-        `Failed to create workflow: ${errorMessage}`,
+        `Failed to create workflow: ${errorMessage}`
       );
 
       if (callback) {
