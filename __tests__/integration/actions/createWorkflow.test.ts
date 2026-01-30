@@ -295,7 +295,7 @@ describe('CREATE_N8N_WORKFLOW action', () => {
       expect(lastText).toContain('cancelled');
     });
 
-    test('regenerates on modify intent', async () => {
+    test('modifies draft using existing workflow on modify intent', async () => {
       const draft = createDraftInCache();
       const mockService = createMockService();
 
@@ -327,14 +327,24 @@ describe('CREATE_N8N_WORKFLOW action', () => {
       );
 
       expect(result.success).toBe(true);
-      expect(mockService.generateWorkflowDraft).toHaveBeenCalledTimes(1);
+      // Should call modifyWorkflowDraft (hybrid), NOT generateWorkflowDraft (from scratch)
+      expect(mockService.modifyWorkflowDraft).toHaveBeenCalledTimes(1);
+      expect(mockService.generateWorkflowDraft).not.toHaveBeenCalled();
       expect(mockService.deployWorkflow).not.toHaveBeenCalled();
 
-      // The regeneration prompt should include original + modification
-      const draftCall = (mockService.generateWorkflowDraft as any).mock.calls[0];
-      const regenerationPrompt = draftCall[0] as string;
-      expect(regenerationPrompt).toContain('Send Stripe summaries via Gmail');
-      expect(regenerationPrompt).toContain('Use Outlook instead of Gmail');
+      // Should pass existing workflow + modification request
+      const modifyCall = (mockService.modifyWorkflowDraft as any).mock.calls[0];
+      expect(modifyCall[0]).toEqual(draft.workflow); // existing workflow
+      expect(modifyCall[1]).toBe('Use Outlook instead of Gmail'); // modification
+
+      // Should show preview with modified workflow
+      const calls = (callback as any).mock.calls;
+      const lastText = calls[calls.length - 1][0].text;
+      expect(lastText).toContain('Workflow Preview');
+      expect(lastText).toContain('Modified Workflow');
+
+      // Should store updated draft in cache
+      expect(runtime.setCache).toHaveBeenCalled();
     });
 
     test('expired draft is cleared and treated as new', async () => {
@@ -400,6 +410,48 @@ describe('CREATE_N8N_WORKFLOW action', () => {
       const lastText = calls[calls.length - 1][0].text;
       expect(lastText).toContain('Stripe Gmail Summary');
       expect(lastText).toContain('current draft');
+    });
+
+    test('overrides confirm to modify when draft has pending clarifications', async () => {
+      const draft = createDraftInCache();
+      // Add pending clarification to the draft workflow
+      draft.workflow._meta = {
+        assumptions: [],
+        suggestions: [],
+        requiresClarification: ['Which email address should receive the summary?'],
+      };
+
+      const mockService = createMockService();
+      const useModel = mock(() =>
+        Promise.resolve({
+          intent: 'confirm',
+          reason: 'User said yes',
+        })
+      );
+
+      const runtime = createMockRuntime({
+        services: { [N8N_WORKFLOW_SERVICE_TYPE]: mockService },
+        useModel,
+        cache: { 'workflow_draft:user-001': draft },
+      });
+
+      const message = createMockMessage({
+        content: { text: 'Use john@example.com' },
+      });
+      const callback = createMockCallback();
+
+      const result = await createWorkflowAction.handler(
+        runtime,
+        message,
+        createMockState(),
+        {},
+        callback
+      );
+
+      expect(result.success).toBe(true);
+      // Should call modifyWorkflowDraft (override confirm → modify), NOT deployWorkflow
+      expect(mockService.modifyWorkflowDraft).toHaveBeenCalledTimes(1);
+      expect(mockService.deployWorkflow).not.toHaveBeenCalled();
     });
 
     test('reports missing credentials after deploy', async () => {

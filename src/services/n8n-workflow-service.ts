@@ -2,8 +2,18 @@ import { type IAgentRuntime, logger, Service } from '@elizaos/core';
 import { N8nApiClient } from '../utils/api';
 import { searchNodes } from '../utils/catalog';
 import { getUserTagName } from '../utils/context';
-import { extractKeywords, generateWorkflow } from '../utils/generation';
-import { positionNodes, validateWorkflow } from '../utils/workflow';
+import {
+  extractKeywords,
+  generateWorkflow,
+  modifyWorkflow,
+  collectExistingNodeDefinitions,
+} from '../utils/generation';
+import {
+  positionNodes,
+  validateWorkflow,
+  validateNodeParameters,
+  validateNodeInputs,
+} from '../utils/workflow';
 import { resolveCredentials } from '../utils/credentialResolver';
 import type {
   N8nWorkflow,
@@ -101,6 +111,31 @@ export class N8nWorkflowService extends Service {
   }
 
   /**
+   * Check generated workflow against node catalog and inject clarification
+   * questions for missing required parameters or disconnected inputs.
+   */
+  private injectCatalogClarifications(workflow: N8nWorkflow): void {
+    const paramWarnings = validateNodeParameters(workflow);
+    const inputWarnings = validateNodeInputs(workflow);
+    const catalogWarnings = [...paramWarnings, ...inputWarnings];
+
+    if (catalogWarnings.length > 0) {
+      logger.warn(
+        { src: 'plugin:n8n-workflow:service:main' },
+        `Catalog validation: ${catalogWarnings.join(', ')}`
+      );
+      if (!workflow._meta) {
+        workflow._meta = {};
+      }
+      const existing = workflow._meta.requiresClarification || [];
+      const clarifications = catalogWarnings.map(
+        (w) => `${w} — please provide this value or clarify your requirements`
+      );
+      workflow._meta.requiresClarification = [...existing, ...clarifications];
+    }
+  }
+
+  /**
    * Get the API client (throws if service not initialized)
    */
   private getClient(): N8nApiClient {
@@ -173,6 +208,64 @@ export class N8nWorkflowService extends Service {
       );
     }
 
+    this.injectCatalogClarifications(workflow);
+    return positionNodes(workflow);
+  }
+
+  /**
+   * Modify an existing workflow draft based on user instructions.
+   * Searches for new nodes mentioned in the modification, combines with existing node defs,
+   * then asks the LLM to patch the workflow.
+   */
+  async modifyWorkflowDraft(
+    existingWorkflow: N8nWorkflow,
+    modificationRequest: string
+  ): Promise<N8nWorkflow> {
+    logger.info(
+      { src: 'plugin:n8n-workflow:service:main' },
+      `Modifying workflow draft: ${modificationRequest.slice(0, 100)}`
+    );
+
+    // Get definitions for nodes already in the workflow
+    const existingDefs = collectExistingNodeDefinitions(existingWorkflow);
+
+    // Search for new nodes the modification might need
+    const keywords = await extractKeywords(this.runtime, modificationRequest);
+    const searchResults = searchNodes(keywords, 10);
+    const newDefs = searchResults.map((r) => r.node);
+
+    // Deduplicate: merge existing + new, preferring existing (already in workflow)
+    const seenNames = new Set(existingDefs.map((d) => d.name));
+    const combinedDefs = [...existingDefs];
+    for (const def of newDefs) {
+      if (!seenNames.has(def.name)) {
+        seenNames.add(def.name);
+        combinedDefs.push(def);
+      }
+    }
+
+    logger.debug(
+      { src: 'plugin:n8n-workflow:service:main' },
+      `Modify context: ${existingDefs.length} existing + ${newDefs.length} searched → ${combinedDefs.length} unique node defs`
+    );
+
+    const workflow = await modifyWorkflow(
+      this.runtime,
+      existingWorkflow,
+      modificationRequest,
+      combinedDefs
+    );
+
+    const validationResult = validateWorkflow(workflow);
+    if (!validationResult.valid) {
+      logger.error(
+        { src: 'plugin:n8n-workflow:service:main' },
+        `Modified workflow validation errors: ${validationResult.errors.join(', ')}`
+      );
+      throw new Error(`Modified workflow is invalid: ${validationResult.errors[0]}`);
+    }
+
+    this.injectCatalogClarifications(workflow);
     return positionNodes(workflow);
   }
 

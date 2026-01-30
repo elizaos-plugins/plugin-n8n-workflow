@@ -84,14 +84,20 @@ export async function resolveCredentials(
  */
 function findCredentialId(credentials: Record<string, string>, credType: string): string | null {
   // Exact match
-  if (credentials[credType]) return credentials[credType];
+  if (credentials[credType]) {
+    return credentials[credType];
+  }
 
   // Try adding/removing "Api" suffix
   const withoutApi = credType.replace(/Api$/, '');
-  if (withoutApi !== credType && credentials[withoutApi]) return credentials[withoutApi];
+  if (withoutApi !== credType && credentials[withoutApi]) {
+    return credentials[withoutApi];
+  }
 
-  const withApi = credType + 'Api';
-  if (credentials[withApi]) return credentials[withApi];
+  const withApi = `${credType}Api`;
+  if (credentials[withApi]) {
+    return credentials[withApi];
+  }
 
   return null;
 }

@@ -259,6 +259,51 @@ const examples: ActionExample[][] = [
       },
     },
   ],
+  [
+    {
+      name: '{{user1}}',
+      content: {
+        text: 'Ok',
+      },
+    },
+    {
+      name: '{{agent}}',
+      content: {
+        text: 'Deploying your workflow...',
+        actions: ['CREATE_N8N_WORKFLOW'],
+      },
+    },
+  ],
+  [
+    {
+      name: '{{user1}}',
+      content: {
+        text: 'Yes',
+      },
+    },
+    {
+      name: '{{agent}}',
+      content: {
+        text: 'Deploying your workflow now.',
+        actions: ['CREATE_N8N_WORKFLOW'],
+      },
+    },
+  ],
+  [
+    {
+      name: '{{user1}}',
+      content: {
+        text: 'Do it',
+      },
+    },
+    {
+      name: '{{agent}}',
+      content: {
+        text: 'Deploying your workflow...',
+        actions: ['CREATE_N8N_WORKFLOW'],
+      },
+    },
+  ],
 ];
 
 export const createWorkflowAction: Action = {
@@ -278,8 +323,10 @@ export const createWorkflowAction: Action = {
   description:
     'Generate, preview, and deploy n8n workflows from natural language. ' +
     'Handles the full lifecycle: generate a draft, show preview, then deploy on user confirmation. ' +
-    'Also handles modify/cancel of pending drafts. Use this action when the user wants to ' +
-    'create an automation, confirm a workflow preview, or cancel a pending workflow draft.',
+    'Also handles modify/cancel of pending drafts. ' +
+    'IMPORTANT: When a workflow draft is pending, this action MUST be used for ANY user response ' +
+    'about the draft — including "yes", "ok", "deploy it", "cancel", or modification requests. ' +
+    'Never reply with text only when a draft is pending.',
 
   validate: async (runtime: IAgentRuntime): Promise<boolean> => {
     return !!runtime.getService(N8N_WORKFLOW_SERVICE_TYPE);
@@ -339,7 +386,7 @@ export const createWorkflowAction: Action = {
         if (effectiveIntent !== intentResult.intent) {
           logger.info(
             { src: 'plugin:n8n-workflow:action:create' },
-            `Draft has pending clarification — overriding "confirm" → "modify" to regenerate with user's answers`
+            'Draft has pending clarification — overriding "confirm" → "modify" to regenerate with user\'s answers'
           );
         }
 
@@ -383,19 +430,36 @@ export const createWorkflowAction: Action = {
           }
 
           case 'modify': {
-            // Regenerate with the original prompt + modification context
-            const modifiedPrompt = `${existingDraft.prompt}\n\nAdditional instructions: ${intentResult.modificationRequest || userText}`;
-            await runtime.deleteCache(cacheKey);
-
-            // Fall through to generation below
-            return await generateAndPreview(
-              runtime,
-              service,
-              modifiedPrompt,
-              userId,
-              cacheKey,
-              callback
+            const modification = intentResult.modificationRequest || userText;
+            logger.info(
+              { src: 'plugin:n8n-workflow:action:create' },
+              `Modifying draft: ${modification.slice(0, 100)}`
             );
+
+            const modifiedWorkflow = await service.modifyWorkflowDraft(
+              existingDraft.workflow,
+              modification
+            );
+
+            const modifiedDraft: WorkflowDraft = {
+              workflow: modifiedWorkflow,
+              prompt: existingDraft.prompt,
+              userId,
+              createdAt: Date.now(),
+            };
+            await runtime.setCache(cacheKey, modifiedDraft);
+
+            if (modifiedWorkflow._meta?.requiresClarification?.length) {
+              if (callback) {
+                await callback({ text: formatClarification(modifiedWorkflow) });
+              }
+              return { success: true };
+            }
+
+            if (callback) {
+              await callback({ text: formatPreview(modifiedWorkflow) });
+            }
+            return { success: true };
           }
 
           case 'new': {
@@ -431,9 +495,9 @@ export const createWorkflowAction: Action = {
               await runtime.setCache(cacheKey, existingDraft);
               if (callback) {
                 await callback({
-                  text:
-                    "I couldn't generate a new workflow from that message. Here is your current draft:\n\n" +
-                    formatPreview(existingDraft.workflow),
+                  text: `I couldn't generate a new workflow from that message. Here is your current draft:\n\n${formatPreview(
+                    existingDraft.workflow
+                  )}`,
                 });
               }
               return { success: true };

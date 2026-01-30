@@ -1,4 +1,5 @@
-import type { N8nWorkflow, WorkflowValidationResult } from '../types/index';
+import type { N8nWorkflow, NodeProperty, WorkflowValidationResult } from '../types/index';
+import { getNodeDefinition } from './catalog';
 
 /**
  * Validate workflow structure and auto-fix common issues
@@ -148,6 +149,143 @@ export function validateWorkflow(workflow: N8nWorkflow): WorkflowValidationResul
     warnings,
     fixedWorkflow,
   };
+}
+
+/**
+ * Validate node parameters against the catalog definitions.
+ *
+ * For each node, looks up its type in the catalog and checks that all
+ * required properties (respecting `displayOptions`) are present in the
+ * node's `parameters` object.
+ *
+ * @returns Array of human-readable warnings for missing required parameters
+ */
+export function validateNodeParameters(workflow: N8nWorkflow): string[] {
+  const warnings: string[] = [];
+
+  for (const node of workflow.nodes) {
+    const nodeDef = getNodeDefinition(node.type);
+    if (!nodeDef) {
+      continue;
+    } // Unknown node type — skip
+
+    for (const prop of nodeDef.properties) {
+      if (!prop.required) {
+        continue;
+      }
+      if (!isPropertyVisible(prop, node.parameters)) {
+        continue;
+      }
+
+      const value = node.parameters?.[prop.name];
+      if (value === undefined || value === null || value === '') {
+        const label = prop.displayName || prop.name;
+        warnings.push(`Node "${node.name}": missing required parameter "${label}"`);
+      }
+    }
+  }
+
+  return warnings;
+}
+
+/**
+ * Check if a node property is visible given the current parameter values.
+ *
+ * n8n uses `displayOptions` to conditionally show/hide parameters:
+ * - `show`: ALL conditions must match for the property to be visible
+ * - `hide`: ANY condition matching hides the property
+ */
+function isPropertyVisible(prop: NodeProperty, parameters: Record<string, unknown>): boolean {
+  if (!prop.displayOptions) {
+    return true;
+  }
+
+  const show = prop.displayOptions as {
+    show?: Record<string, unknown[]>;
+    hide?: Record<string, unknown[]>;
+  };
+
+  // If "show" is defined, ALL conditions must match
+  if (show.show) {
+    for (const [key, allowedValues] of Object.entries(show.show)) {
+      if (!Array.isArray(allowedValues)) {
+        continue;
+      }
+      const paramValue = parameters?.[key];
+      if (!allowedValues.includes(paramValue)) {
+        return false;
+      }
+    }
+  }
+
+  // If "hide" is defined, ANY match hides the property
+  if (show.hide) {
+    for (const [key, hiddenValues] of Object.entries(show.hide)) {
+      if (!Array.isArray(hiddenValues)) {
+        continue;
+      }
+      const paramValue = parameters?.[key];
+      if (hiddenValues.includes(paramValue)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Validate that nodes have the expected number of incoming connections
+ * based on their catalog definition's `inputs` array.
+ *
+ * For example, a Merge node with `inputs: ["main", "main"]` needs 2 incoming connections.
+ *
+ * @returns Array of warnings for nodes with fewer connections than expected
+ */
+export function validateNodeInputs(workflow: N8nWorkflow): string[] {
+  const warnings: string[] = [];
+
+  // Count incoming connections per node
+  const incomingCount = new Map<string, number>();
+  for (const node of workflow.nodes) {
+    incomingCount.set(node.name, 0);
+  }
+  for (const outputs of Object.values(workflow.connections)) {
+    for (const connectionGroups of Object.values(outputs)) {
+      for (const connections of connectionGroups) {
+        for (const conn of connections) {
+          incomingCount.set(conn.node, (incomingCount.get(conn.node) || 0) + 1);
+        }
+      }
+    }
+  }
+
+  for (const node of workflow.nodes) {
+    const nodeDef = getNodeDefinition(node.type);
+    if (!nodeDef) {
+      continue;
+    }
+
+    const isTrigger =
+      node.type.toLowerCase().includes('trigger') ||
+      node.type.toLowerCase().includes('webhook') ||
+      nodeDef.group.includes('trigger');
+
+    if (isTrigger) {
+      continue;
+    } // Triggers don't need incoming connections
+
+    const expectedInputs = nodeDef.inputs.filter((i) => i === 'main').length;
+    const actualInputs = incomingCount.get(node.name) || 0;
+
+    if (expectedInputs > 0 && actualInputs < expectedInputs) {
+      warnings.push(
+        `Node "${node.name}" expects ${expectedInputs} input(s) but has ${actualInputs}`
+      );
+    }
+  }
+
+  return warnings;
 }
 
 /**

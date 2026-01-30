@@ -178,6 +178,9 @@ This plugin combines patterns from:
 # Install dependencies
 bun install
 
+# Generate node catalog (required before first build)
+bun run crawl-nodes
+
 # Build
 bun run build
 
@@ -193,6 +196,9 @@ bun run lint
 # Format
 bun run format
 ```
+
+> **Note:** `src/data/defaultNodes.json` is generated from `n8n-nodes-base` and gitignored.
+> Run `bun run crawl-nodes` after cloning or when updating the `n8n-nodes-base` dependency.
 
 ## License
 

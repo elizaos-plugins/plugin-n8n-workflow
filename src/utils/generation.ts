@@ -18,6 +18,7 @@ import {
   workflowMatchingSchema,
   draftIntentSchema,
 } from '../schemas/index';
+import { getNodeDefinition } from './catalog';
 
 /**
  * Extracts keywords from user prompt using LLM
@@ -186,29 +187,49 @@ ${userMessage}`,
 }
 
 /**
+ * Parse LLM response into an N8nWorkflow object.
+ * Strips markdown code fences and validates basic structure.
+ */
+function parseWorkflowResponse(response: string): N8nWorkflow {
+  const cleaned = response
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```\s*$/, '')
+    .trim();
+
+  let workflow: N8nWorkflow;
+  try {
+    workflow = JSON.parse(cleaned) as N8nWorkflow;
+  } catch (error) {
+    throw new Error(
+      `Failed to parse workflow JSON: ${error instanceof Error ? error.message : String(error)}\n\nRaw response: ${response}`
+    );
+  }
+
+  if (!workflow.nodes || !Array.isArray(workflow.nodes)) {
+    throw new Error('Invalid workflow: missing or invalid nodes array');
+  }
+
+  if (!workflow.connections || typeof workflow.connections !== 'object') {
+    throw new Error('Invalid workflow: missing or invalid connections object');
+  }
+
+  return workflow;
+}
+
+/**
  * Generate n8n workflow from natural language using LLM
- * Adapted from n8n-intelligence to use ElizaOS runtime
  *
  * @param runtime - ElizaOS runtime for model access
  * @param userPrompt - User's workflow description
  * @param relevantNodes - Nodes found by keyword search
  * @returns Generated workflow JSON
- *
- * @example
- * ```typescript
- * const workflow = await generateWorkflow(
- *   runtime,
- *   "Send me Stripe summaries via Gmail",
- *   [gmailNode, stripeNode, scheduleNode]
- * );
- * ```
  */
 export async function generateWorkflow(
   runtime: IAgentRuntime,
   userPrompt: string,
   relevantNodes: NodeDefinition[]
 ): Promise<N8nWorkflow> {
-  // Build full prompt with system instructions + relevant nodes + user request
   const fullPrompt = `${WORKFLOW_GENERATION_SYSTEM_PROMPT}
 
 ## Relevant Nodes Available
@@ -223,43 +244,94 @@ ${userPrompt}
 
 Generate a valid n8n workflow JSON that fulfills this request.`;
 
-  // Use TEXT_LARGE with JSON response format
   const response = await runtime.useModel(ModelType.TEXT_LARGE, {
     prompt: fullPrompt,
     temperature: 0,
     responseFormat: { type: 'json_object' },
   });
 
-  // Parse workflow JSON
-  let workflow: N8nWorkflow;
-  try {
-    // Remove markdown code fences if present
-    const cleanedResponse = response
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/i, '')
-      .replace(/```\s*$/, '')
-      .trim();
+  const workflow = parseWorkflowResponse(response);
 
-    workflow = JSON.parse(cleanedResponse) as N8nWorkflow;
-  } catch (error) {
-    throw new Error(
-      `Failed to parse workflow JSON: ${error instanceof Error ? error.message : String(error)}\n\nRaw response: ${response}`
-    );
-  }
-
-  // Ensure workflow has a name (n8n API requires it)
   if (!workflow.name) {
     workflow.name = `Workflow - ${userPrompt.slice(0, 50).trim()}`;
   }
 
-  // Basic validation
-  if (!workflow.nodes || !Array.isArray(workflow.nodes)) {
-    throw new Error('Invalid workflow: missing or invalid nodes array');
-  }
-
-  if (!workflow.connections || typeof workflow.connections !== 'object') {
-    throw new Error('Invalid workflow: missing or invalid connections object');
-  }
-
   return workflow;
+}
+
+/**
+ * Modify an existing n8n workflow based on user instructions.
+ *
+ * Sends the existing workflow JSON + modification instructions to the LLM,
+ * which patches the workflow (add/remove/change nodes, connections, parameters).
+ * Reuses WORKFLOW_GENERATION_SYSTEM_PROMPT so the LLM has full n8n knowledge.
+ *
+ * @param runtime - ElizaOS runtime for model access
+ * @param existingWorkflow - The current workflow to modify
+ * @param modificationRequest - What the user wants changed
+ * @param relevantNodes - Node definitions (existing + any new ones from keyword search)
+ * @returns Modified workflow JSON
+ */
+export async function modifyWorkflow(
+  runtime: IAgentRuntime,
+  existingWorkflow: N8nWorkflow,
+  modificationRequest: string,
+  relevantNodes: NodeDefinition[]
+): Promise<N8nWorkflow> {
+  const { _meta, ...workflowForLLM } = existingWorkflow;
+
+  const fullPrompt = `${WORKFLOW_GENERATION_SYSTEM_PROMPT}
+
+## Relevant Nodes Available
+
+${JSON.stringify(relevantNodes, null, 2)}
+
+Use these node definitions to modify the workflow. Each node's "properties" field defines the available parameters.
+
+## Existing Workflow (modify this)
+
+${JSON.stringify(workflowForLLM, null, 2)}
+
+## Modification Request
+
+${modificationRequest}
+
+Modify the existing workflow according to the request above. Return the COMPLETE modified workflow JSON.
+Keep all unchanged nodes and connections intact. Only add, remove, or change what the user asked for.`;
+
+  const response = await runtime.useModel(ModelType.TEXT_LARGE, {
+    prompt: fullPrompt,
+    temperature: 0,
+    responseFormat: { type: 'json_object' },
+  });
+
+  return parseWorkflowResponse(response);
+}
+
+/**
+ * Collect node definitions for all nodes already in a workflow.
+ * Used to give the LLM full context about existing nodes during modification.
+ */
+export function collectExistingNodeDefinitions(workflow: N8nWorkflow): NodeDefinition[] {
+  const defs: NodeDefinition[] = [];
+  const seen = new Set<string>();
+
+  for (const node of workflow.nodes) {
+    if (seen.has(node.type)) {
+      continue;
+    }
+    seen.add(node.type);
+
+    const def = getNodeDefinition(node.type);
+    if (def) {
+      defs.push(def);
+    } else {
+      logger.warn(
+        { src: 'plugin:n8n-workflow:generation:modify' },
+        `No catalog definition found for node type "${node.type}" — LLM will have limited context for this node`
+      );
+    }
+  }
+
+  return defs;
 }

@@ -11,6 +11,26 @@ import defaultNodesData from '../data/defaultNodes.json' assert { type: 'json' }
 const NODE_CATALOG = defaultNodesData as NodeDefinition[];
 
 /**
+ * Look up a node definition by its type name
+ *
+ * Handles both full names ("n8n-nodes-base.gmail") and bare names ("gmail").
+ */
+export function getNodeDefinition(typeName: string): NodeDefinition | undefined {
+  // Try exact match first
+  const exact = NODE_CATALOG.find((n) => n.name === typeName);
+  if (exact) {
+    return exact;
+  }
+
+  // Try without prefix (e.g., "gmail" matches "n8n-nodes-base.gmail")
+  const bare = typeName.replace(/^n8n-nodes-base\./, '');
+  return NODE_CATALOG.find((n) => {
+    const catalogBare = n.name.replace(/^n8n-nodes-base\./, '');
+    return catalogBare === bare || n.name === bare;
+  });
+}
+
+/**
  * Search n8n node catalog using keyword scoring
  *
  * Scoring algorithm:
