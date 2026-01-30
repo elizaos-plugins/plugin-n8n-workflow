@@ -197,6 +197,66 @@ const examples: ActionExample[][] = [
       },
     },
   ],
+  [
+    {
+      name: '{{user1}}',
+      content: {
+        text: 'Looks good, confirm',
+      },
+    },
+    {
+      name: '{{agent}}',
+      content: {
+        text: 'Deploying your workflow...',
+        actions: ['CREATE_N8N_WORKFLOW'],
+      },
+    },
+  ],
+  [
+    {
+      name: '{{user1}}',
+      content: {
+        text: 'Go ahead and create it',
+      },
+    },
+    {
+      name: '{{agent}}',
+      content: {
+        text: 'Deploying your workflow...',
+        actions: ['CREATE_N8N_WORKFLOW'],
+      },
+    },
+  ],
+  [
+    {
+      name: '{{user1}}',
+      content: {
+        text: 'Cancel the workflow',
+      },
+    },
+    {
+      name: '{{agent}}',
+      content: {
+        text: 'Workflow draft cancelled.',
+        actions: ['CREATE_N8N_WORKFLOW'],
+      },
+    },
+  ],
+  [
+    {
+      name: '{{user1}}',
+      content: {
+        text: 'Actually, use Outlook instead of Gmail',
+      },
+    },
+    {
+      name: '{{agent}}',
+      content: {
+        text: 'Regenerating the workflow with Outlook...',
+        actions: ['CREATE_N8N_WORKFLOW'],
+      },
+    },
+  ],
 ];
 
 export const createWorkflowAction: Action = {
