@@ -9,7 +9,11 @@ import {
   deactivateWorkflowAction,
   deleteWorkflowAction,
 } from './actions/index';
-import { workflowStatusProvider, activeWorkflowsProvider } from './providers/index';
+import {
+  workflowStatusProvider,
+  activeWorkflowsProvider,
+  pendingDraftProvider,
+} from './providers/index';
 
 /**
  * n8n Workflow Plugin for ElizaOS
@@ -62,7 +66,7 @@ export const n8nWorkflowPlugin: Plugin = {
     deleteWorkflowAction,
   ],
 
-  providers: [workflowStatusProvider, activeWorkflowsProvider],
+  providers: [workflowStatusProvider, activeWorkflowsProvider, pendingDraftProvider],
 
   init: async (_config: Record<string, string>, runtime: IAgentRuntime): Promise<void> => {
     const apiKey = runtime.getSetting('N8N_API_KEY');
