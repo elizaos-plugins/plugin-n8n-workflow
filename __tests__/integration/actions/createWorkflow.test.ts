@@ -358,6 +358,50 @@ describe('CREATE_N8N_WORKFLOW action', () => {
       expect(runtime.deleteCache).toHaveBeenCalled();
     });
 
+    test('new intent with vague message restores draft on generation failure', async () => {
+      const draft = createDraftInCache();
+      const mockService = createMockService({
+        generateWorkflowDraft: mock(() => Promise.reject(new Error('No relevant n8n nodes found'))),
+      });
+
+      const useModel = mock(() =>
+        Promise.resolve({
+          intent: 'new',
+          reason: 'User wants a different workflow',
+        })
+      );
+
+      const runtime = createMockRuntime({
+        services: { [N8N_WORKFLOW_SERVICE_TYPE]: mockService },
+        useModel,
+        cache: { 'workflow_draft:user-001': draft },
+      });
+
+      const message = createMockMessage({
+        content: { text: 'do something' },
+      });
+      const callback = createMockCallback();
+
+      const result = await createWorkflowAction.handler(
+        runtime,
+        message,
+        createMockState(),
+        {},
+        callback
+      );
+
+      expect(result.success).toBe(true);
+
+      // Draft should be restored in cache
+      expect(runtime.setCache).toHaveBeenCalled();
+
+      // Should show the original draft preview
+      const calls = (callback as any).mock.calls;
+      const lastText = calls[calls.length - 1][0].text;
+      expect(lastText).toContain('Stripe Gmail Summary');
+      expect(lastText).toContain('current draft');
+    });
+
     test('reports missing credentials after deploy', async () => {
       const draft = createDraftInCache();
       const mockService = createMockService({

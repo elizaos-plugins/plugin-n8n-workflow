@@ -45,7 +45,7 @@ export function createMockService(
       Promise.resolve({
         id: 'wf-001',
         name: 'Generated Workflow',
-        active: false,
+        active: true,
         nodeCount: 2,
         missingCredentials: [],
       })

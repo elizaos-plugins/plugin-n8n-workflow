@@ -313,6 +313,48 @@ describe('resolveCredentials', () => {
       expect(res.injectedCredentials.get('slackApi')).toBe('slack-cred');
     });
   });
+
+  test('fuzzy match: resolves config key without Api suffix when workflow uses Api suffix', () => {
+    // Workflow node uses "gmailOAuth2Api" but config has "gmailOAuth2"
+    const workflow = createValidWorkflow();
+    const runtime = createMockRuntime();
+    const apiClient = createMockApiClient();
+    const config: N8nPluginConfig = {
+      apiKey: 'key',
+      host: 'http://localhost',
+      credentials: { gmailOAuth2: 'gmail-cred-from-config' },
+    };
+
+    return resolveCredentials(workflow, 'user-001', runtime, apiClient, config).then((res) => {
+      expect(res.injectedCredentials.get('gmailOAuth2Api')).toBe('gmail-cred-from-config');
+      expect(res.missingConnections).toHaveLength(0);
+    });
+  });
+
+  test('fuzzy match: resolves config key with Api suffix when workflow omits it', () => {
+    // Workflow node uses "gmailOAuth2" but config has "gmailOAuth2Api"
+    const workflow = createValidWorkflow({
+      nodes: [
+        createTriggerNode(),
+        {
+          ...createGmailNode(),
+          credentials: { gmailOAuth2: { id: 'PLACEHOLDER', name: 'Gmail' } },
+        },
+      ],
+    });
+    const runtime = createMockRuntime();
+    const apiClient = createMockApiClient();
+    const config: N8nPluginConfig = {
+      apiKey: 'key',
+      host: 'http://localhost',
+      credentials: { gmailOAuth2Api: 'gmail-cred-with-api' },
+    };
+
+    return resolveCredentials(workflow, 'user-001', runtime, apiClient, config).then((res) => {
+      expect(res.injectedCredentials.get('gmailOAuth2')).toBe('gmail-cred-with-api');
+      expect(res.missingConnections).toHaveLength(0);
+    });
+  });
 });
 
 // ============================================================================
@@ -330,6 +372,34 @@ describe('getMissingCredentials', () => {
 
   test('detects PLACEHOLDER credentials', () => {
     const result = getMissingCredentials(createWorkflowWithPlaceholderCreds());
+    expect(result).toContain('gmailOAuth2Api');
+  });
+
+  test('detects {{CREDENTIAL_ID}} template placeholders', () => {
+    const workflow = createValidWorkflow({
+      nodes: [
+        createTriggerNode(),
+        {
+          ...createGmailNode(),
+          credentials: { gmailOAuth2Api: { id: '{{CREDENTIAL_ID}}', name: 'Gmail' } },
+        },
+      ],
+    });
+    const result = getMissingCredentials(workflow);
+    expect(result).toContain('gmailOAuth2Api');
+  });
+
+  test('detects empty string credential IDs', () => {
+    const workflow = createValidWorkflow({
+      nodes: [
+        createTriggerNode(),
+        {
+          ...createGmailNode(),
+          credentials: { gmailOAuth2Api: { id: '', name: 'Gmail' } },
+        },
+      ],
+    });
+    const result = getMissingCredentials(workflow);
     expect(result).toContain('gmailOAuth2Api');
   });
 

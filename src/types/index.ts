@@ -323,7 +323,7 @@ export interface WorkflowDraft {
 }
 
 export interface DraftIntentResult {
-  intent: 'confirm' | 'cancel' | 'modify' | 'new';
+  intent: 'confirm' | 'cancel' | 'modify' | 'new' | 'show_preview';
   modificationRequest?: string;
   reason: string;
 }

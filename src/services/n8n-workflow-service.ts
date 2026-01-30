@@ -1,9 +1,10 @@
 import { type IAgentRuntime, logger, Service } from '@elizaos/core';
 import { N8nApiClient } from '../utils/api';
 import { searchNodes } from '../utils/catalog';
+import { getUserTagName } from '../utils/context';
 import { extractKeywords, generateWorkflow } from '../utils/generation';
 import { positionNodes, validateWorkflow } from '../utils/workflow';
-import { resolveCredentials, getMissingCredentials } from '../utils/credentialResolver';
+import { resolveCredentials } from '../utils/credentialResolver';
 import type {
   N8nWorkflow,
   N8nWorkflowResponse,
@@ -56,11 +57,12 @@ export class N8nWorkflowService extends Service {
       throw new Error('N8N_HOST is required in settings (e.g., https://your.n8n.cloud)');
     }
 
-    // Get optional pre-configured credentials
-    const n8nSettings = runtime.getSetting('n8n') as
+    // Get optional pre-configured credentials from character.settings.workflows
+    // Note: runtime.getSetting() only returns primitives — nested objects must be read directly
+    const workflowSettings = runtime.character?.settings?.workflows as
       | { credentials?: Record<string, string> }
       | undefined;
-    const credentials = n8nSettings?.credentials;
+    const credentials = workflowSettings?.credentials;
 
     const service = new N8nWorkflowService(runtime);
     service.serviceConfig = {
@@ -77,10 +79,15 @@ export class N8nWorkflowService extends Service {
       `N8n Workflow Service started - connected to ${host}`
     );
     if (credentials) {
-      logger.info(
-        { src: 'plugin:n8n-workflow:service:main' },
-        `Pre-configured credentials: ${Object.keys(credentials).join(', ')}`
-      );
+      const configured = Object.entries(credentials)
+        .filter(([, v]) => v)
+        .map(([k]) => k);
+      if (configured.length > 0) {
+        logger.info(
+          { src: 'plugin:n8n-workflow:service:main' },
+          `Pre-configured credentials: ${configured.join(', ')}`
+        );
+      }
     }
 
     return service;
@@ -191,19 +198,30 @@ export class N8nWorkflowService extends Service {
 
     const createdWorkflow = await client.createWorkflow(credentialResult.workflow);
 
+    // Activate (publish) the workflow immediately after creation
+    let active = false;
+    try {
+      await client.activateWorkflow(createdWorkflow.id);
+      active = true;
+      logger.info(
+        { src: 'plugin:n8n-workflow:service:main' },
+        `Workflow ${createdWorkflow.id} activated`
+      );
+    } catch (error) {
+      logger.warn(
+        { src: 'plugin:n8n-workflow:service:main' },
+        `Failed to activate workflow: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
     if (userId) {
       try {
-        const tagsResponse = await client.listTags();
-        let userTag = tagsResponse.data.find((t) => t.name === `user:${userId}`);
-
-        if (!userTag) {
-          userTag = await client.createTag(`user:${userId}`);
-        }
-
+        const tagName = await getUserTagName(this.runtime, userId);
+        const userTag = await client.getOrCreateTag(tagName);
         await client.updateWorkflowTags(createdWorkflow.id, [userTag.id]);
         logger.debug(
           { src: 'plugin:n8n-workflow:service:main' },
-          `Tagged workflow ${createdWorkflow.id} with user:${userId}`
+          `Tagged workflow ${createdWorkflow.id} with "${tagName}"`
         );
       } catch (error) {
         logger.warn(
@@ -221,9 +239,9 @@ export class N8nWorkflowService extends Service {
     return {
       id: createdWorkflow.id,
       name: createdWorkflow.name,
-      active: createdWorkflow.active ?? false,
+      active,
       nodeCount: createdWorkflow.nodes?.length || 0,
-      missingCredentials: getMissingCredentials(credentialResult.workflow),
+      missingCredentials: credentialResult.missingConnections.map((m) => m.credType),
     };
   }
 
@@ -234,9 +252,9 @@ export class N8nWorkflowService extends Service {
     const client = this.getClient();
 
     if (userId) {
-      // Filter by user tag
+      const tagName = await getUserTagName(this.runtime, userId);
       const tagsResponse = await client.listTags();
-      const userTag = tagsResponse.data.find((t) => t.name === `user:${userId}`);
+      const userTag = tagsResponse.data.find((t) => t.name === tagName);
 
       if (!userTag) {
         return []; // No workflows for this user

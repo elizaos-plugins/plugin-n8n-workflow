@@ -142,8 +142,10 @@ export async function classifyDraftIntent(
 Nodes: ${draft.workflow.nodes.map((n) => `${n.name} (${n.type})`).join(', ')}
 Original prompt: "${draft.prompt}"`;
 
-  const result = (await runtime.useModel(ModelType.OBJECT_SMALL, {
-    prompt: `${DRAFT_INTENT_SYSTEM_PROMPT}
+  let result: DraftIntentResult;
+  try {
+    result = (await runtime.useModel(ModelType.OBJECT_SMALL, {
+      prompt: `${DRAFT_INTENT_SYSTEM_PROMPT}
 
 ## Current Draft
 
@@ -152,16 +154,27 @@ ${draftSummary}
 ## User Message
 
 ${userMessage}`,
-    schema: draftIntentSchema,
-  })) as DraftIntentResult;
+      schema: draftIntentSchema,
+    })) as DraftIntentResult;
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    logger.error(
+      { src: 'plugin:n8n-workflow:generation:intent', error: errMsg },
+      `classifyDraftIntent failed: ${errMsg}`
+    );
+    return {
+      intent: 'show_preview',
+      reason: `Intent classification failed (${errMsg}) — re-showing preview`,
+    };
+  }
 
   const validIntents = ['confirm', 'cancel', 'modify', 'new'] as const;
   if (!result?.intent || !validIntents.includes(result.intent as (typeof validIntents)[number])) {
     logger.warn(
       { src: 'plugin:n8n-workflow:generation:intent' },
-      `Invalid intent from LLM: ${JSON.stringify(result?.intent)}, defaulting to confirm`
+      `Invalid intent from LLM: ${JSON.stringify(result)}, re-showing preview`
     );
-    return { intent: 'confirm', reason: 'Could not classify intent — defaulting to confirm' };
+    return { intent: 'show_preview', reason: 'Could not classify intent — re-showing preview' };
   }
 
   logger.debug(

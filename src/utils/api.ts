@@ -300,7 +300,15 @@ export class N8nApiClient {
     if (existing) {
       return existing;
     }
-    return this.createTag(name);
+    try {
+      return await this.createTag(name);
+    } catch {
+      // 409 "Tag already exists" — pagination may have missed it, re-fetch
+      const { data: refreshed } = await this.listTags();
+      const found = refreshed.find((tag) => tag.name.toLowerCase() === name.toLowerCase());
+      if (found) return found;
+      throw new Error(`Tag "${name}" reportedly exists but could not be found`);
+    }
   }
 
   // ============================================================================

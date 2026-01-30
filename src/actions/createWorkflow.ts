@@ -113,7 +113,9 @@ function formatPreview(workflow: N8nWorkflow): string {
     lines.push('');
   }
 
-  lines.push('Reply to **confirm**, **modify**, or **cancel** this workflow.');
+  lines.push('---');
+  lines.push('This workflow is a **draft** and has **not been deployed** yet.');
+  lines.push('Reply **confirm** to deploy, **modify** to change, or **cancel** to discard.');
 
   return lines.join('\n');
 }
@@ -326,7 +328,22 @@ export const createWorkflowAction: Action = {
           `Draft intent: ${intentResult.intent} — ${intentResult.reason}`
         );
 
-        switch (intentResult.intent) {
+        // If the draft was awaiting clarification and the user answered, treat "confirm" as "modify"
+        // to regenerate with the user's answers instead of deploying an incomplete draft.
+        const effectiveIntent =
+          intentResult.intent === 'confirm' &&
+          existingDraft.workflow._meta?.requiresClarification?.length
+            ? 'modify'
+            : intentResult.intent;
+
+        if (effectiveIntent !== intentResult.intent) {
+          logger.info(
+            { src: 'plugin:n8n-workflow:action:create' },
+            `Draft has pending clarification — overriding "confirm" → "modify" to regenerate with user's answers`
+          );
+        }
+
+        switch (effectiveIntent) {
           case 'confirm': {
             const result = await service.deployWorkflow(existingDraft.workflow, userId);
             await runtime.deleteCache(cacheKey);
@@ -382,19 +399,57 @@ export const createWorkflowAction: Action = {
           }
 
           case 'new': {
-            // User wants something completely different
-            await runtime.deleteCache(cacheKey);
-
+            // User wants something completely different — but only if the message actually
+            // describes a new workflow. If generation fails (e.g. vague prompt), recover
+            // by restoring the existing draft instead of losing it.
             if (!userText) {
               if (callback) {
                 await callback({
                   text: 'Previous draft cancelled. Please describe the workflow you want to create.',
                 });
               }
+              await runtime.deleteCache(cacheKey);
               return { success: false };
             }
 
-            return await generateAndPreview(runtime, service, userText, userId, cacheKey, callback);
+            await runtime.deleteCache(cacheKey);
+            try {
+              return await generateAndPreview(
+                runtime,
+                service,
+                userText,
+                userId,
+                cacheKey,
+                callback
+              );
+            } catch {
+              // Generation failed (likely vague prompt) — restore the draft and re-show preview
+              logger.warn(
+                { src: 'plugin:n8n-workflow:action:create' },
+                'New workflow generation failed — restoring previous draft'
+              );
+              await runtime.setCache(cacheKey, existingDraft);
+              if (callback) {
+                await callback({
+                  text:
+                    "I couldn't generate a new workflow from that message. Here is your current draft:\n\n" +
+                    formatPreview(existingDraft.workflow),
+                });
+              }
+              return { success: true };
+            }
+          }
+
+          default: {
+            // show_preview fallback — re-display the draft preview
+            logger.info(
+              { src: 'plugin:n8n-workflow:action:create' },
+              'Intent classification unclear — re-showing preview'
+            );
+            if (callback) {
+              await callback({ text: formatPreview(existingDraft.workflow) });
+            }
+            return { success: true };
           }
         }
       }

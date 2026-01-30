@@ -55,8 +55,11 @@ export async function resolveCredentials(
         missingConnections,
         runtime
       );
-    } else if (config.credentials?.[credType]) {
-      credId = config.credentials[credType];
+    } else if (config.credentials) {
+      credId = findCredentialId(config.credentials, credType);
+      if (!credId) {
+        missingConnections.push({ credType });
+      }
     } else {
       missingConnections.push({ credType });
     }
@@ -73,6 +76,24 @@ export async function resolveCredentials(
     missingConnections,
     injectedCredentials,
   };
+}
+
+/**
+ * Look up a credential ID from config, tolerating naming mismatches
+ * (e.g. LLM generates "gmailOAuth2Api" but config has "gmailOAuth2", or vice-versa).
+ */
+function findCredentialId(credentials: Record<string, string>, credType: string): string | null {
+  // Exact match
+  if (credentials[credType]) return credentials[credType];
+
+  // Try adding/removing "Api" suffix
+  const withoutApi = credType.replace(/Api$/, '');
+  if (withoutApi !== credType && credentials[withoutApi]) return credentials[withoutApi];
+
+  const withApi = credType + 'Api';
+  if (credentials[withApi]) return credentials[withApi];
+
+  return null;
 }
 
 function extractRequiredCredentialTypes(workflow: N8nWorkflow): Set<string> {
@@ -250,8 +271,11 @@ export function getMissingCredentials(workflow: N8nWorkflow): string[] {
   for (const node of workflow.nodes || []) {
     if (node.credentials) {
       for (const [credType, credRef] of Object.entries(node.credentials)) {
-        if (typeof credRef === 'object' && 'id' in credRef && credRef.id === 'PLACEHOLDER') {
-          missing.add(credType);
+        if (typeof credRef === 'object' && 'id' in credRef) {
+          const id = credRef.id;
+          if (!id || id === 'PLACEHOLDER' || id.includes('{{')) {
+            missing.add(credType);
+          }
         }
       }
     }
