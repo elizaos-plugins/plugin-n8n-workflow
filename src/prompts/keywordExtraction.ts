@@ -1,6 +1,5 @@
 /**
  * System prompt for keyword extraction from user workflow descriptions
- * Adapted from n8n-intelligence for ElizaOS
  */
 
 export const KEYWORD_EXTRACTION_SYSTEM_PROMPT = `You are an expert at extracting relevant search terms for finding n8n nodes.

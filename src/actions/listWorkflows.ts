@@ -132,5 +132,3 @@ export const listWorkflowsAction: Action = {
 
   examples,
 };
-
-export default listWorkflowsAction;

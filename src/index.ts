@@ -8,7 +8,6 @@ import {
   activateWorkflowAction,
   deactivateWorkflowAction,
   deleteWorkflowAction,
-  executeWorkflowAction,
 } from './actions/index';
 import { workflowStatusProvider, activeWorkflowsProvider } from './providers/index';
 
@@ -61,7 +60,6 @@ export const n8nWorkflowPlugin: Plugin = {
     activateWorkflowAction,
     deactivateWorkflowAction,
     deleteWorkflowAction,
-    executeWorkflowAction,
   ],
 
   providers: [workflowStatusProvider, activeWorkflowsProvider],

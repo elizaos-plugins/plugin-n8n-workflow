@@ -1,7 +1,5 @@
 /**
  * System prompt for n8n workflow generation
- * Adapted from n8n-intelligence with credential injection instructions
- * @see https://github.com/n8n-intelligence/worker/utils/prompt.ts
  */
 
 export const WORKFLOW_GENERATION_SYSTEM_PROMPT = `## n8n Workflow AI Definition: Core Concepts
@@ -279,16 +277,17 @@ For parameter validation and types, rely on the node's type definition and basic
 
 ## **Handling Incomplete or Ambiguous Prompts**
 
+The workflow will be shown to the user as a preview before deployment. Use the \`_meta\` field to communicate assumptions, suggestions, and clarification needs.
+
 When the user prompt lacks specific details:
 
 1. **Make reasonable assumptions** based on common use cases
 2. **Use sensible defaults**:
    - Email service: Prefer Gmail over generic SMTP
    - Schedule: Default to daily at 9 AM if frequency not specified
-   - Error handling: Include basic error notifications
    - Data format: Use JSON for structured data
 
-3. **Document your assumptions** in a special \`_meta\` field:
+3. **Always include a \`_meta\` field** documenting your reasoning:
 
 \`\`\`json
 {
@@ -298,33 +297,40 @@ When the user prompt lacks specific details:
   "_meta": {
     "assumptions": [
       "Using Gmail as email service (not specified)",
-      "Running daily at 9 AM (frequency not specified)",
-      "Sending to primary email address (recipient not specified)"
+      "Running daily at 9 AM (frequency not specified)"
     ],
     "suggestions": [
       "Consider adding error notification to Slack",
-      "You may want to filter payments by status",
-      "Add a condition node to check if data is empty"
+      "You may want to filter payments by status"
     ],
-    "requiresClarification": [
-      "Which email address should receive the summary?",
-      "Should failed payments be included?"
-    ]
+    "requiresClarification": []
   }
 }
 \`\`\`
 
-4. **If critically ambiguous** (multiple valid interpretations):
-   - Set \`_meta.requiresClarification\` with specific questions
-   - Still generate a valid workflow with best-guess defaults
-   - The user can approve or request modifications
+4. **Use \`requiresClarification\` aggressively** when:
+   - The request is so vague that you cannot determine which services to use (e.g. "automate something", "help me with work")
+   - Critical parameters are missing AND cannot be reasonably inferred (e.g. "send data" — send where? what data?)
+   - Multiple fundamentally different interpretations exist (e.g. "connect my CRM" — which CRM? what operation?)
+   - The request names a service but gives no indication of what action to perform on it
 
-**Example ambiguous prompt**: "Send me payment info"
-- Assumption: Stripe payments (most common)
-- Assumption: Email via Gmail
-- Clarification needed: "Which email address?" / "All payments or just successful ones?"
+5. **Do NOT use \`requiresClarification\`** for:
+   - Minor details that have sensible defaults (schedule frequency, email subject, timezone)
+   - Preferences that can be changed later (formatting, specific field mappings)
+   - Things you can reasonably infer from context
+
+**Examples:**
+
+Prompt: "Send me Stripe payment summaries via Gmail every Monday"
+→ Clear enough. Generate workflow. \`requiresClarification: []\`. Document email address assumption in \`assumptions\`.
+
+Prompt: "automate my business"
+→ Too vague. Generate a minimal best-guess workflow and set \`requiresClarification: ["What specific task or process would you like to automate?", "Which services or tools are involved?"]\`.
+
+Prompt: "connect Slack and Gmail"
+→ Ambiguous action. \`requiresClarification: ["What should happen between Slack and Gmail? For example: forward emails to Slack, post Slack messages via email, etc."]\`. Still generate a best-guess workflow.
 
 ---
 
-**IMPORTANT**: Always generate a complete, valid workflow even if assumptions are made. Never leave placeholders or incomplete nodes.
+**IMPORTANT**: Always generate a complete, valid workflow even if assumptions are made. Never leave placeholders or incomplete nodes. The \`requiresClarification\` questions will be shown to the user alongside the preview — they can then refine their request.
 `;

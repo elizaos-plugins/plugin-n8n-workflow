@@ -10,6 +10,131 @@ import {
   type State,
 } from '@elizaos/core';
 import { N8N_WORKFLOW_SERVICE_TYPE, type N8nWorkflowService } from '../services/index';
+import type { N8nWorkflow, WorkflowDraft } from '../types/index';
+import { classifyDraftIntent } from '../utils/generation';
+
+const DRAFT_TTL_MS = 30 * 60 * 1000;
+
+/**
+ * Build a human-readable preview of a workflow draft
+ */
+function formatPreview(workflow: N8nWorkflow): string {
+  const lines: string[] = [];
+
+  lines.push(`**Workflow Preview: "${workflow.name}"**`);
+  lines.push('');
+
+  // Nodes summary
+  lines.push(`**Nodes (${workflow.nodes.length}):**`);
+  for (let i = 0; i < workflow.nodes.length; i++) {
+    const node = workflow.nodes[i];
+    const typeName = node.type.replace('n8n-nodes-base.', '');
+    lines.push(`  ${i + 1}. **${node.name}** — \`${typeName}\``);
+  }
+  lines.push('');
+
+  // Flow summary (from connections)
+  const connectionNames = Object.keys(workflow.connections);
+  if (connectionNames.length > 0) {
+    const flowParts: string[] = [];
+    const visited = new Set<string>();
+
+    // Find the starting node (one that is a source but not a target)
+    const targets = new Set<string>();
+    for (const sourceName of connectionNames) {
+      const outputs = workflow.connections[sourceName];
+      for (const outputType of Object.values(outputs)) {
+        for (const connections of outputType) {
+          for (const conn of connections) {
+            targets.add(conn.node);
+          }
+        }
+      }
+    }
+    const startNodes = connectionNames.filter((n) => !targets.has(n));
+    const queue = startNodes.length > 0 ? [startNodes[0]] : [connectionNames[0]];
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (!current || visited.has(current)) {
+        continue;
+      }
+      visited.add(current);
+      flowParts.push(current);
+
+      const outputs = workflow.connections[current];
+      if (outputs) {
+        for (const outputType of Object.values(outputs)) {
+          for (const connections of outputType) {
+            for (const conn of connections) {
+              queue.push(conn.node);
+            }
+          }
+        }
+      }
+    }
+
+    lines.push(`**Flow:** ${flowParts.join(' → ')}`);
+    lines.push('');
+  }
+
+  // Credentials needed
+  const credTypes = new Set<string>();
+  for (const node of workflow.nodes) {
+    if (node.credentials) {
+      for (const credType of Object.keys(node.credentials)) {
+        credTypes.add(credType);
+      }
+    }
+  }
+  if (credTypes.size > 0) {
+    lines.push('**Credentials needed:**');
+    for (const cred of credTypes) {
+      lines.push(`  - \`${cred}\``);
+    }
+    lines.push('');
+  }
+
+  // Meta: assumptions
+  if (workflow._meta?.assumptions?.length) {
+    lines.push('**Assumptions made:**');
+    for (const a of workflow._meta.assumptions) {
+      lines.push(`  - ${a}`);
+    }
+    lines.push('');
+  }
+
+  // Meta: suggestions
+  if (workflow._meta?.suggestions?.length) {
+    lines.push('**Suggestions:**');
+    for (const s of workflow._meta.suggestions) {
+      lines.push(`  - ${s}`);
+    }
+    lines.push('');
+  }
+
+  lines.push('Reply to **confirm**, **modify**, or **cancel** this workflow.');
+
+  return lines.join('\n');
+}
+
+/**
+ * Format clarification questions from the LLM
+ */
+function formatClarification(workflow: N8nWorkflow): string {
+  const questions = workflow._meta?.requiresClarification || [];
+  const lines: string[] = [];
+
+  lines.push('I need a bit more information before I can create this workflow:');
+  lines.push('');
+  for (const q of questions) {
+    lines.push(`- ${q}`);
+  }
+  lines.push('');
+  lines.push("Please provide more details and I'll generate the workflow.");
+
+  return lines.join('\n');
+}
 
 const examples: ActionExample[][] = [
   [
@@ -57,6 +182,21 @@ const examples: ActionExample[][] = [
       },
     },
   ],
+  [
+    {
+      name: '{{user1}}',
+      content: {
+        text: 'Yes, deploy it',
+      },
+    },
+    {
+      name: '{{agent}}',
+      content: {
+        text: 'Deploying your workflow now...',
+        actions: ['CREATE_N8N_WORKFLOW'],
+      },
+    },
+  ],
 ];
 
 export const createWorkflowAction: Action = {
@@ -69,12 +209,15 @@ export const createWorkflowAction: Action = {
     'CREATE_AUTOMATION',
     'BUILD_N8N_WORKFLOW',
     'SETUP_WORKFLOW',
+    'CONFIRM_WORKFLOW',
+    'DEPLOY_WORKFLOW',
+    'CANCEL_WORKFLOW',
   ],
   description:
-    'Generate and deploy an n8n workflow from a natural language description. ' +
-    'The workflow will be created using native n8n nodes (Gmail, Slack, Stripe, etc.) ' +
-    'and deployed to n8n Cloud. Use this action when the user wants to automate a task ' +
-    'or create an integration between different services.',
+    'Generate, preview, and deploy n8n workflows from natural language. ' +
+    'Handles the full lifecycle: generate a draft, show preview, then deploy on user confirmation. ' +
+    'Also handles modify/cancel of pending drafts. Use this action when the user wants to ' +
+    'create an automation, confirm a workflow preview, or cancel a pending workflow draft.',
 
   validate: async (runtime: IAgentRuntime): Promise<boolean> => {
     return !!runtime.getService(N8N_WORKFLOW_SERVICE_TYPE);
@@ -102,15 +245,105 @@ export const createWorkflowAction: Action = {
       return { success: false };
     }
 
-    try {
-      const content = message.content as Content;
-      const prompt = (content.text ?? '').trim();
+    const content = message.content as Content;
+    const userText = (content.text ?? '').trim();
+    const userId = message.entityId;
+    const cacheKey = `workflow_draft:${userId}`;
 
-      if (!prompt) {
-        logger.error(
+    try {
+      let existingDraft = await runtime.getCache<WorkflowDraft>(cacheKey);
+
+      if (existingDraft && Date.now() - existingDraft.createdAt > DRAFT_TTL_MS) {
+        logger.debug({ src: 'plugin:n8n-workflow:action:create' }, 'Draft expired, clearing cache');
+        await runtime.deleteCache(cacheKey);
+        existingDraft = undefined;
+      }
+
+      if (existingDraft) {
+        const intentResult = await classifyDraftIntent(runtime, userText, existingDraft);
+        logger.info(
           { src: 'plugin:n8n-workflow:action:create' },
-          'No prompt provided for workflow creation'
+          `Draft intent: ${intentResult.intent} — ${intentResult.reason}`
         );
+
+        switch (intentResult.intent) {
+          case 'confirm': {
+            if (callback) {
+              await callback({ text: 'Deploying your workflow...' });
+            }
+
+            const result = await service.deployWorkflow(existingDraft.workflow, userId);
+            await runtime.deleteCache(cacheKey);
+
+            let responseText = `Workflow "${result.name}" deployed successfully!\n\n`;
+            responseText += `**Workflow ID:** ${result.id}\n`;
+            responseText += `**Nodes:** ${result.nodeCount}\n`;
+            responseText += `**Status:** ${result.active ? 'Active' : 'Inactive'}\n`;
+
+            if (result.missingCredentials.length > 0) {
+              responseText += '\n**Action Required:**\n';
+              responseText += 'Please connect the following services in n8n Cloud:\n';
+              for (const credType of result.missingCredentials) {
+                responseText += `- \`${credType}\`\n`;
+              }
+              responseText +=
+                '\nThe workflow will be ready to run once these connections are configured.';
+            } else {
+              responseText += '\nAll credentials configured — workflow is ready to run!';
+            }
+
+            if (callback) {
+              await callback({ text: responseText });
+            }
+
+            return { success: true, data: result };
+          }
+
+          case 'cancel': {
+            await runtime.deleteCache(cacheKey);
+
+            if (callback) {
+              await callback({ text: 'Workflow draft cancelled.' });
+            }
+
+            return { success: true };
+          }
+
+          case 'modify': {
+            // Regenerate with the original prompt + modification context
+            const modifiedPrompt = `${existingDraft.prompt}\n\nAdditional instructions: ${intentResult.modificationRequest || userText}`;
+            await runtime.deleteCache(cacheKey);
+
+            // Fall through to generation below
+            return await generateAndPreview(
+              runtime,
+              service,
+              modifiedPrompt,
+              userId,
+              cacheKey,
+              callback
+            );
+          }
+
+          case 'new': {
+            // User wants something completely different
+            await runtime.deleteCache(cacheKey);
+
+            if (!userText) {
+              if (callback) {
+                await callback({
+                  text: 'Previous draft cancelled. Please describe the workflow you want to create.',
+                });
+              }
+              return { success: false };
+            }
+
+            return await generateAndPreview(runtime, service, userText, userId, cacheKey, callback);
+          }
+        }
+      }
+
+      if (!userText) {
         if (callback) {
           await callback({
             text: 'Please provide a description of the workflow you want to create.',
@@ -119,53 +352,7 @@ export const createWorkflowAction: Action = {
         return { success: false };
       }
 
-      logger.info(
-        { src: 'plugin:n8n-workflow:action:create' },
-        `Creating workflow from prompt: ${prompt.slice(0, 100)}...`
-      );
-
-      if (callback) {
-        await callback({
-          text: 'Analyzing your request and searching for relevant n8n nodes...',
-        });
-      }
-
-      // Create workflow using the service's RAG pipeline
-      const result = await service.createWorkflowFromPrompt(prompt, message.entityId);
-
-      logger.info(
-        { src: 'plugin:n8n-workflow:action:create' },
-        `Workflow created successfully: ${result.id} (${result.nodeCount} nodes)`
-      );
-
-      // Build response message
-      let responseText = `✅ Workflow "${result.name}" created successfully!\n\n`;
-      responseText += `**Workflow ID:** ${result.id}\n`;
-      responseText += `**Nodes:** ${result.nodeCount}\n`;
-      responseText += `**Status:** ${result.active ? 'Active' : 'Inactive'}\n`;
-
-      if (result.missingCredentials.length > 0) {
-        responseText += '\n⚠️  **Action Required:**\n';
-        responseText += 'Please connect the following services in n8n Cloud:\n';
-        for (const credType of result.missingCredentials) {
-          responseText += `- ${credType}\n`;
-        }
-        responseText +=
-          '\nThe workflow will be ready to run once these connections are configured.';
-      } else {
-        responseText += '\n✅ All credentials configured - workflow is ready to run!';
-      }
-
-      if (callback) {
-        await callback({
-          text: responseText,
-        });
-      }
-
-      return {
-        success: true,
-        data: result,
-      };
+      return await generateAndPreview(runtime, service, userText, userId, cacheKey, callback);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error(
@@ -186,4 +373,48 @@ export const createWorkflowAction: Action = {
   examples,
 };
 
-export default createWorkflowAction;
+/**
+ * Generate a workflow draft, store it in cache, and show preview or clarification
+ */
+async function generateAndPreview(
+  runtime: IAgentRuntime,
+  service: N8nWorkflowService,
+  prompt: string,
+  userId: string,
+  cacheKey: string,
+  callback?: HandlerCallback
+): Promise<ActionResult> {
+  logger.info(
+    { src: 'plugin:n8n-workflow:action:create' },
+    `Generating workflow from prompt: ${prompt.slice(0, 100)}...`
+  );
+
+  if (callback) {
+    await callback({
+      text: 'Analyzing your request and generating a workflow draft...',
+    });
+  }
+
+  const workflow = await service.generateWorkflowDraft(prompt);
+
+  const draft: WorkflowDraft = {
+    workflow,
+    prompt,
+    userId,
+    createdAt: Date.now(),
+  };
+  await runtime.setCache(cacheKey, draft);
+
+  if (workflow._meta?.requiresClarification?.length) {
+    if (callback) {
+      await callback({ text: formatClarification(workflow) });
+    }
+    return { success: true };
+  }
+
+  if (callback) {
+    await callback({ text: formatPreview(workflow) });
+  }
+
+  return { success: true };
+}

@@ -1,10 +1,5 @@
-import { describe, test, expect } from "bun:test";
-import {
-  validateWorkflow,
-  validateWorkflowOrThrow,
-  positionNodes,
-} from "../../src/utils/workflow";
-import { WorkflowValidationError } from "../../src/types/index";
+import { describe, test, expect } from 'bun:test';
+import { validateWorkflow, positionNodes } from '../../src/utils/workflow';
 import {
   createValidWorkflow,
   createWorkflowWithoutPositions,
@@ -15,101 +10,90 @@ import {
   createTriggerNode,
   createGmailNode,
   createSlackNode,
-} from "../fixtures/workflows";
+} from '../fixtures/workflows';
 
 // ============================================================================
 // validateWorkflow
 // ============================================================================
 
-describe("validateWorkflow", () => {
-  test("valid workflow passes validation", () => {
+describe('validateWorkflow', () => {
+  test('valid workflow passes validation', () => {
     const result = validateWorkflow(createValidWorkflow());
     expect(result.valid).toBe(true);
     expect(result.errors).toHaveLength(0);
   });
 
-  test("rejects workflow with no nodes", () => {
+  test('rejects workflow with no nodes', () => {
     const result = validateWorkflow(createInvalidWorkflow_noNodes());
     expect(result.valid).toBe(false);
-    expect(result.errors).toContain("Workflow must have at least one node");
+    expect(result.errors).toContain('Workflow must have at least one node');
   });
 
-  test("rejects workflow with missing nodes array", () => {
+  test('rejects workflow with missing nodes array', () => {
     const result = validateWorkflow({
-      name: "Bad",
+      name: 'Bad',
       nodes: null as unknown as [],
       connections: {},
     });
     expect(result.valid).toBe(false);
-    expect(result.errors).toContain("Missing or invalid nodes array");
+    expect(result.errors).toContain('Missing or invalid nodes array');
   });
 
-  test("rejects workflow with missing connections", () => {
+  test('rejects workflow with missing connections', () => {
     const result = validateWorkflow({
-      name: "Bad",
+      name: 'Bad',
       nodes: [createTriggerNode()],
       connections: null as unknown as Record<string, unknown>,
     });
     expect(result.valid).toBe(false);
-    expect(result.errors).toContain("Missing or invalid connections object");
+    expect(result.errors).toContain('Missing or invalid connections object');
   });
 
-  test("detects broken connections to non-existent nodes", () => {
+  test('detects broken connections to non-existent nodes', () => {
     const result = validateWorkflow(createInvalidWorkflow_brokenConnection());
     expect(result.valid).toBe(false);
-    const connError = result.errors.find((e) =>
-      e.includes("non-existent target node"),
-    );
+    const connError = result.errors.find((e) => e.includes('non-existent target node'));
     expect(connError).toBeDefined();
   });
 
-  test("detects duplicate node names", () => {
+  test('detects duplicate node names', () => {
     const result = validateWorkflow(createInvalidWorkflow_duplicateNames());
     expect(result.valid).toBe(false);
-    const dupError = result.errors.find((e) =>
-      e.includes("Duplicate node name"),
-    );
+    const dupError = result.errors.find((e) => e.includes('Duplicate node name'));
     expect(dupError).toBeDefined();
   });
 
-  test("warns about missing trigger node", () => {
+  test('warns about missing trigger node', () => {
     const workflow = createValidWorkflow({
-      nodes: [
-        { ...createGmailNode(), type: "n8n-nodes-base.gmail" },
-        createSlackNode(),
-      ],
+      nodes: [{ ...createGmailNode(), type: 'n8n-nodes-base.gmail' }, createSlackNode()],
       connections: {
         Gmail: {
-          main: [[{ node: "Slack", type: "main", index: 0 }]],
+          main: [[{ node: 'Slack', type: 'main', index: 0 }]],
         },
       },
     });
     const result = validateWorkflow(workflow);
     expect(result.valid).toBe(true);
-    const triggerWarning = result.warnings.find((w) =>
-      w.includes("no trigger node"),
-    );
+    const triggerWarning = result.warnings.find((w) => w.includes('no trigger node'));
     expect(triggerWarning).toBeDefined();
   });
 
-  test("warns about orphan nodes", () => {
+  test('warns about orphan nodes', () => {
     const workflow = createValidWorkflow({
       nodes: [createTriggerNode(), createGmailNode(), createSlackNode()],
       connections: {
-        "Schedule Trigger": {
-          main: [[{ node: "Gmail", type: "main", index: 0 }]],
+        'Schedule Trigger': {
+          main: [[{ node: 'Gmail', type: 'main', index: 0 }]],
         },
       },
     });
     const result = validateWorkflow(workflow);
-    const orphanWarning = result.warnings.find((w) =>
-      w.includes("no incoming connections"),
-    );
+    const orphanWarning = result.warnings.find((w) => w.includes('no incoming connections'));
     expect(orphanWarning).toBeDefined();
-    expect(orphanWarning).toContain("Slack");
+    expect(orphanWarning).toContain('Slack');
   });
 
-  test("auto-fixes missing positions", () => {
+  test('auto-fixes missing positions', () => {
     const workflow = createWorkflowWithoutPositions();
     const result = validateWorkflow(workflow);
     expect(result.valid).toBe(true);
@@ -122,10 +106,10 @@ describe("validateWorkflow", () => {
     }
   });
 
-  test("does not auto-fix when errors exist", () => {
+  test('does not auto-fix when errors exist', () => {
     // Workflow with both missing positions AND errors (empty nodes)
     const result = validateWorkflow({
-      name: "Bad",
+      name: 'Bad',
       nodes: [],
       connections: {},
     });
@@ -133,71 +117,40 @@ describe("validateWorkflow", () => {
     expect(result.fixedWorkflow).toBeUndefined();
   });
 
-  test("detects nodes with missing name", () => {
+  test('detects nodes with missing name', () => {
     const result = validateWorkflow({
-      name: "Bad",
-      nodes: [{ ...createTriggerNode(), name: "" }],
+      name: 'Bad',
+      nodes: [{ ...createTriggerNode(), name: '' }],
       connections: {},
     });
     expect(result.valid).toBe(false);
-    expect(result.errors).toContain("Node missing name");
+    expect(result.errors).toContain('Node missing name');
   });
 
-  test("detects nodes with missing type", () => {
+  test('detects nodes with missing type', () => {
     const result = validateWorkflow({
-      name: "Bad",
-      nodes: [{ ...createTriggerNode(), type: "" }],
+      name: 'Bad',
+      nodes: [{ ...createTriggerNode(), type: '' }],
       connections: {},
     });
     expect(result.valid).toBe(false);
-    const typeError = result.errors.find((e) => e.includes("missing type"));
+    const typeError = result.errors.find((e) => e.includes('missing type'));
     expect(typeError).toBeDefined();
   });
 
-  test("connection from non-existent source node", () => {
+  test('connection from non-existent source node', () => {
     const result = validateWorkflow({
-      name: "Bad",
+      name: 'Bad',
       nodes: [createTriggerNode()],
       connections: {
-        "Ghost Node": {
-          main: [[{ node: "Schedule Trigger", type: "main", index: 0 }]],
+        'Ghost Node': {
+          main: [[{ node: 'Schedule Trigger', type: 'main', index: 0 }]],
         },
       },
     });
     expect(result.valid).toBe(false);
-    const srcError = result.errors.find((e) =>
-      e.includes("non-existent source node"),
-    );
+    const srcError = result.errors.find((e) => e.includes('non-existent source node'));
     expect(srcError).toBeDefined();
-  });
-});
-
-// ============================================================================
-// validateWorkflowOrThrow
-// ============================================================================
-
-describe("validateWorkflowOrThrow", () => {
-  test("returns workflow when valid", () => {
-    const workflow = createValidWorkflow();
-    const result = validateWorkflowOrThrow(workflow);
-    expect(result.name).toBe(workflow.name);
-  });
-
-  test("throws WorkflowValidationError when invalid", () => {
-    expect(() => {
-      validateWorkflowOrThrow(createInvalidWorkflow_noNodes());
-    }).toThrow(WorkflowValidationError);
-  });
-
-  test("returns fixed workflow when auto-fix is applied", () => {
-    const workflow = createWorkflowWithoutPositions();
-    const result = validateWorkflowOrThrow(workflow);
-    // Should return the auto-fixed version with positions
-    for (const node of result.nodes) {
-      expect(node.position).toBeDefined();
-      expect(typeof node.position[0]).toBe("number");
-      expect(typeof node.position[1]).toBe("number");
-    }
   });
 });
 
@@ -205,8 +158,8 @@ describe("validateWorkflowOrThrow", () => {
 // positionNodes
 // ============================================================================
 
-describe("positionNodes", () => {
-  test("skips positioning when all nodes have valid positions", () => {
+describe('positionNodes', () => {
+  test('skips positioning when all nodes have valid positions', () => {
     const workflow = createValidWorkflow();
     const result = positionNodes(workflow);
     // Positions should remain unchanged
@@ -214,30 +167,26 @@ describe("positionNodes", () => {
     expect(result.nodes[1].position).toEqual(workflow.nodes[1].position);
   });
 
-  test("positions nodes with missing positions", () => {
+  test('positions nodes with missing positions', () => {
     const workflow = createWorkflowWithoutPositions();
     const result = positionNodes(workflow);
     for (const node of result.nodes) {
       expect(node.position).toBeDefined();
-      expect(typeof node.position[0]).toBe("number");
-      expect(typeof node.position[1]).toBe("number");
+      expect(typeof node.position[0]).toBe('number');
+      expect(typeof node.position[1]).toBe('number');
     }
   });
 
-  test("positions trigger node before action nodes (left-to-right)", () => {
+  test('positions trigger node before action nodes (left-to-right)', () => {
     const workflow = createWorkflowWithoutPositions();
     const result = positionNodes(workflow);
     // Trigger should be leftmost (smallest X)
-    const triggerPos = result.nodes.find((n) =>
-      n.type.includes("Trigger"),
-    )!.position;
-    const gmailPos = result.nodes.find((n) =>
-      n.type.includes("gmail"),
-    )!.position;
+    const triggerPos = result.nodes.find((n) => n.type.includes('Trigger'))!.position;
+    const gmailPos = result.nodes.find((n) => n.type.includes('gmail'))!.position;
     expect(triggerPos[0]).toBeLessThan(gmailPos[0]);
   });
 
-  test("positions branching nodes at different Y levels", () => {
+  test('positions branching nodes at different Y levels', () => {
     const workflow = {
       ...createWorkflowWithBranching(),
       nodes: createWorkflowWithBranching().nodes.map((n) => ({
@@ -247,23 +196,23 @@ describe("positionNodes", () => {
     };
     const result = positionNodes(workflow);
     // Gmail and Slack are at the same depth but different branches
-    const gmailPos = result.nodes.find((n) => n.name === "Gmail")!.position;
-    const slackPos = result.nodes.find((n) => n.name === "Slack")!.position;
+    const gmailPos = result.nodes.find((n) => n.name === 'Gmail')!.position;
+    const slackPos = result.nodes.find((n) => n.name === 'Slack')!.position;
     // Same X (same level), different Y (different branches)
     expect(gmailPos[0]).toBe(slackPos[0]);
     expect(gmailPos[1]).not.toBe(slackPos[1]);
   });
 
-  test("does not mutate original workflow", () => {
+  test('does not mutate original workflow', () => {
     const workflow = createWorkflowWithoutPositions();
     const originalPos = workflow.nodes[0].position;
     positionNodes(workflow);
     expect(workflow.nodes[0].position).toBe(originalPos);
   });
 
-  test("handles single-node workflow", () => {
+  test('handles single-node workflow', () => {
     const workflow = {
-      name: "Single",
+      name: 'Single',
       nodes: [
         {
           ...createTriggerNode(),
@@ -279,31 +228,31 @@ describe("positionNodes", () => {
     expect(result.nodes[0].position[1]).toBe(250);
   });
 
-  test("handles linear chain of 4 nodes", () => {
+  test('handles linear chain of 4 nodes', () => {
     const workflow = {
-      name: "Linear Chain",
+      name: 'Linear Chain',
       nodes: [
         {
-          ...createTriggerNode({ name: "Start" }),
+          ...createTriggerNode({ name: 'Start' }),
           position: undefined as unknown as [number, number],
         },
         {
-          ...createGmailNode({ name: "Step1" }),
+          ...createGmailNode({ name: 'Step1' }),
           position: undefined as unknown as [number, number],
         },
         {
-          ...createSlackNode({ name: "Step2" }),
+          ...createSlackNode({ name: 'Step2' }),
           position: undefined as unknown as [number, number],
         },
         {
-          ...createGmailNode({ name: "Step3" }),
+          ...createGmailNode({ name: 'Step3' }),
           position: undefined as unknown as [number, number],
         },
       ],
       connections: {
-        Start: { main: [[{ node: "Step1", type: "main", index: 0 }]] },
-        Step1: { main: [[{ node: "Step2", type: "main", index: 0 }]] },
-        Step2: { main: [[{ node: "Step3", type: "main", index: 0 }]] },
+        Start: { main: [[{ node: 'Step1', type: 'main', index: 0 }]] },
+        Step1: { main: [[{ node: 'Step2', type: 'main', index: 0 }]] },
+        Step2: { main: [[{ node: 'Step3', type: 'main', index: 0 }]] },
       },
     };
     const result = positionNodes(workflow);

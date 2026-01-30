@@ -3,14 +3,21 @@ import {
   KeywordExtractionResult,
   N8nWorkflow,
   WorkflowMatchResult,
+  WorkflowDraft,
+  DraftIntentResult,
   NodeDefinition,
 } from '../types/index';
 import {
   KEYWORD_EXTRACTION_SYSTEM_PROMPT,
   WORKFLOW_GENERATION_SYSTEM_PROMPT,
+  DRAFT_INTENT_SYSTEM_PROMPT,
 } from '../prompts/index';
 import { WORKFLOW_MATCHING_SYSTEM_PROMPT } from '../prompts/workflowMatching';
-import { keywordExtractionSchema, workflowMatchingSchema } from '../schemas/index';
+import {
+  keywordExtractionSchema,
+  workflowMatchingSchema,
+  draftIntentSchema,
+} from '../schemas/index';
 
 /**
  * Extracts keywords from user prompt using LLM
@@ -88,12 +95,10 @@ export async function matchWorkflow(
 Available workflows:
 ${workflowList}`;
 
-    const response = await runtime.useModel(ModelType.OBJECT_SMALL, {
+    const result = (await runtime.useModel(ModelType.OBJECT_SMALL, {
       prompt: `${WORKFLOW_MATCHING_SYSTEM_PROMPT}\n\n${userPrompt}`,
       schema: workflowMatchingSchema,
-    });
-
-    const result = response as unknown as WorkflowMatchResult;
+    })) as WorkflowMatchResult;
 
     logger.debug(
       { src: 'plugin:n8n-workflow:generation:matcher' },
@@ -115,6 +120,56 @@ ${workflowList}`;
       reason: `Workflow matching service unavailable: ${errorMessage}`,
     };
   }
+}
+
+/**
+ * Classify user intent when a workflow draft exists in cache
+ *
+ * The LLM determines whether the user wants to confirm, cancel, modify, or create a new workflow
+ * based on their message and the existing draft context.
+ *
+ * @param runtime - ElizaOS runtime for model access
+ * @param userMessage - User's current message
+ * @param draft - The existing workflow draft from cache
+ * @returns Intent classification with optional modification request
+ */
+export async function classifyDraftIntent(
+  runtime: IAgentRuntime,
+  userMessage: string,
+  draft: WorkflowDraft
+): Promise<DraftIntentResult> {
+  const draftSummary = `Workflow: "${draft.workflow.name}"
+Nodes: ${draft.workflow.nodes.map((n) => `${n.name} (${n.type})`).join(', ')}
+Original prompt: "${draft.prompt}"`;
+
+  const result = (await runtime.useModel(ModelType.OBJECT_SMALL, {
+    prompt: `${DRAFT_INTENT_SYSTEM_PROMPT}
+
+## Current Draft
+
+${draftSummary}
+
+## User Message
+
+${userMessage}`,
+    schema: draftIntentSchema,
+  })) as DraftIntentResult;
+
+  const validIntents = ['confirm', 'cancel', 'modify', 'new'] as const;
+  if (!result?.intent || !validIntents.includes(result.intent as (typeof validIntents)[number])) {
+    logger.warn(
+      { src: 'plugin:n8n-workflow:generation:intent' },
+      `Invalid intent from LLM: ${JSON.stringify(result?.intent)}, defaulting to confirm`
+    );
+    return { intent: 'confirm', reason: 'Could not classify intent — defaulting to confirm' };
+  }
+
+  logger.debug(
+    { src: 'plugin:n8n-workflow:generation:intent' },
+    `Draft intent: ${result.intent} — ${result.reason}`
+  );
+
+  return result;
 }
 
 /**

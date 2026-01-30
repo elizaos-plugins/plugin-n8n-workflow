@@ -153,5 +153,3 @@ export const deleteWorkflowAction: Action = {
 
   examples,
 };
-
-export default deleteWorkflowAction;

@@ -1,5 +1,6 @@
 import {
   N8nWorkflow,
+  N8nNode,
   N8nWorkflowResponse,
   N8nCredential,
   N8nCredentialSchema,
@@ -9,8 +10,75 @@ import {
 } from '../types/index';
 
 /**
+ * Strip readOnly and internal fields from a workflow before sending to n8n API.
+ * The n8n API uses `additionalProperties: false` — any unknown field causes 400.
+ * Required fields: name, nodes, connections, settings.
+ */
+function toWorkflowPayload(workflow: N8nWorkflow): Record<string, unknown> {
+  return {
+    name: workflow.name,
+    nodes: workflow.nodes.map(toNodePayload),
+    connections: workflow.connections,
+    settings: workflow.settings ?? {},
+  };
+}
+
+/**
+ * Strip readOnly fields from a node before sending to n8n API.
+ * The node schema also uses `additionalProperties: false`.
+ */
+function toNodePayload(node: N8nNode): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    name: node.name,
+    type: node.type,
+    typeVersion: node.typeVersion,
+    position: node.position,
+    parameters: node.parameters,
+  };
+  if (node.id) {
+    payload.id = node.id;
+  }
+  if (node.credentials) {
+    payload.credentials = node.credentials;
+  }
+  if (node.disabled !== undefined) {
+    payload.disabled = node.disabled;
+  }
+  if (node.notes) {
+    payload.notes = node.notes;
+  }
+  if (node.notesInFlow !== undefined) {
+    payload.notesInFlow = node.notesInFlow;
+  }
+  if (node.color) {
+    payload.color = node.color;
+  }
+  if (node.continueOnFail !== undefined) {
+    payload.continueOnFail = node.continueOnFail;
+  }
+  if (node.executeOnce !== undefined) {
+    payload.executeOnce = node.executeOnce;
+  }
+  if (node.alwaysOutputData !== undefined) {
+    payload.alwaysOutputData = node.alwaysOutputData;
+  }
+  if (node.retryOnFail !== undefined) {
+    payload.retryOnFail = node.retryOnFail;
+  }
+  if (node.maxTries !== undefined) {
+    payload.maxTries = node.maxTries;
+  }
+  if (node.waitBetweenTries !== undefined) {
+    payload.waitBetweenTries = node.waitBetweenTries;
+  }
+  if (node.onError) {
+    payload.onError = node.onError;
+  }
+  return payload;
+}
+
+/**
  * n8n REST API client
- * Full coverage of n8n Cloud API for workflow, credential, execution, and tag management
  * @see https://docs.n8n.io/api/
  */
 export class N8nApiClient {
@@ -31,7 +99,7 @@ export class N8nApiClient {
    * @see POST /workflows
    */
   async createWorkflow(workflow: N8nWorkflow): Promise<N8nWorkflowResponse> {
-    return this.request<N8nWorkflowResponse>('POST', '/workflows', workflow);
+    return this.request<N8nWorkflowResponse>('POST', '/workflows', toWorkflowPayload(workflow));
   }
 
   /**
@@ -76,8 +144,12 @@ export class N8nApiClient {
    * Update a workflow
    * @see PUT /workflows/{id}
    */
-  async updateWorkflow(id: string, workflow: Partial<N8nWorkflow>): Promise<N8nWorkflowResponse> {
-    return this.request<N8nWorkflowResponse>('PUT', `/workflows/${id}`, workflow);
+  async updateWorkflow(id: string, workflow: N8nWorkflow): Promise<N8nWorkflowResponse> {
+    return this.request<N8nWorkflowResponse>(
+      'PUT',
+      `/workflows/${id}`,
+      toWorkflowPayload(workflow)
+    );
   }
 
   /**
@@ -105,21 +177,15 @@ export class N8nApiClient {
   }
 
   /**
-   * Manually execute a workflow
-   * @see POST /workflows/{id}/execute
-   */
-  async executeWorkflow(id: string): Promise<N8nExecution> {
-    return this.request<N8nExecution>('POST', `/workflows/${id}/execute`);
-  }
-
-  /**
    * Update workflow tags
    * @see PUT /workflows/{id}/tags
    */
-  async updateWorkflowTags(id: string, tagIds: string[]): Promise<N8nWorkflowResponse> {
-    return this.request<N8nWorkflowResponse>('PUT', `/workflows/${id}/tags`, {
-      tags: tagIds,
-    });
+  async updateWorkflowTags(id: string, tagIds: string[]): Promise<N8nTag[]> {
+    return this.request<N8nTag[]>(
+      'PUT',
+      `/workflows/${id}/tags`,
+      tagIds.map((id) => ({ id }))
+    );
   }
 
   // ============================================================================
@@ -164,7 +230,7 @@ export class N8nApiClient {
    */
   async listExecutions(params?: {
     workflowId?: string;
-    status?: 'success' | 'error' | 'running' | 'waiting';
+    status?: 'canceled' | 'error' | 'running' | 'success' | 'waiting';
     limit?: number;
     cursor?: string;
   }): Promise<{ data: N8nExecution[]; nextCursor?: string }> {
