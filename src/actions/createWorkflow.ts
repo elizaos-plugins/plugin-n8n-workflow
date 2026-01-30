@@ -268,10 +268,6 @@ export const createWorkflowAction: Action = {
 
         switch (intentResult.intent) {
           case 'confirm': {
-            if (callback) {
-              await callback({ text: 'Deploying your workflow...' });
-            }
-
             const result = await service.deployWorkflow(existingDraft.workflow, userId);
             await runtime.deleteCache(cacheKey);
 
@@ -389,12 +385,6 @@ async function generateAndPreview(
     `Generating workflow from prompt: ${prompt.slice(0, 100)}...`
   );
 
-  if (callback) {
-    await callback({
-      text: 'Analyzing your request and generating a workflow draft...',
-    });
-  }
-
   const workflow = await service.generateWorkflowDraft(prompt);
 
   const draft: WorkflowDraft = {
@@ -405,6 +395,8 @@ async function generateAndPreview(
   };
   await runtime.setCache(cacheKey, draft);
 
+  // ElizaOS allows only one callback per handler invocation (same message ID is reused).
+  // Send either clarification questions or the full preview — never both.
   if (workflow._meta?.requiresClarification?.length) {
     if (callback) {
       await callback({ text: formatClarification(workflow) });
