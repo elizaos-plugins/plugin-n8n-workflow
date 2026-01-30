@@ -155,6 +155,15 @@ ${userMessage}`,
     schema: draftIntentSchema,
   })) as DraftIntentResult;
 
+  const validIntents = ['confirm', 'cancel', 'modify', 'new'] as const;
+  if (!result?.intent || !validIntents.includes(result.intent as (typeof validIntents)[number])) {
+    logger.warn(
+      { src: 'plugin:n8n-workflow:generation:intent' },
+      `Invalid intent from LLM: ${JSON.stringify(result?.intent)}, defaulting to confirm`
+    );
+    return { intent: 'confirm', reason: 'Could not classify intent — defaulting to confirm' };
+  }
+
   logger.debug(
     { src: 'plugin:n8n-workflow:generation:intent' },
     `Draft intent: ${result.intent} — ${result.reason}`

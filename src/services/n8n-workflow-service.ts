@@ -173,17 +173,17 @@ export class N8nWorkflowService extends Service {
    * Deploy a previously generated workflow.
    * Resolves credentials and creates the workflow via n8n API.
    */
-  async deployWorkflow(workflow: N8nWorkflow, userId?: string): Promise<WorkflowCreationResult> {
+  async deployWorkflow(workflow: N8nWorkflow, userId: string): Promise<WorkflowCreationResult> {
     logger.info(
       { src: 'plugin:n8n-workflow:service:main' },
-      `Deploying workflow "${workflow.name}" for user ${userId || 'unknown'}`
+      `Deploying workflow "${workflow.name}" for user ${userId}`
     );
 
     const config = this.getConfig();
     const client = this.getClient();
     const credentialResult = await resolveCredentials(
       workflow,
-      userId || '',
+      userId,
       this.runtime,
       client,
       config

@@ -325,7 +325,7 @@ Prompt: "Send me Stripe payment summaries via Gmail every Monday"
 → Clear enough. Generate workflow. \`requiresClarification: []\`. Document email address assumption in \`assumptions\`.
 
 Prompt: "automate my business"
-→ Too vague. Generate nothing useful. \`requiresClarification: ["What specific task or process would you like to automate?", "Which services or tools are involved?"]\`.
+→ Too vague. Generate a minimal best-guess workflow and set \`requiresClarification: ["What specific task or process would you like to automate?", "Which services or tools are involved?"]\`.
 
 Prompt: "connect Slack and Gmail"
 → Ambiguous action. \`requiresClarification: ["What should happen between Slack and Gmail? For example: forward emails to Slack, post Slack messages via email, etc."]\`. Still generate a best-guess workflow.

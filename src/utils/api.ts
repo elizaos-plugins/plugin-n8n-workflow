@@ -50,6 +50,12 @@ function toNodePayload(node: N8nNode): Record<string, unknown> {
   if (node.notesInFlow !== undefined) {
     payload.notesInFlow = node.notesInFlow;
   }
+  if (node.color) {
+    payload.color = node.color;
+  }
+  if (node.continueOnFail !== undefined) {
+    payload.continueOnFail = node.continueOnFail;
+  }
   if (node.executeOnce !== undefined) {
     payload.executeOnce = node.executeOnce;
   }

@@ -55,8 +55,8 @@ function formatPreview(workflow: N8nWorkflow): string {
     const queue = startNodes.length > 0 ? [startNodes[0]] : [connectionNames[0]];
 
     while (queue.length > 0) {
-      const current = queue.shift()!;
-      if (visited.has(current)) {
+      const current = queue.shift();
+      if (!current || visited.has(current)) {
         continue;
       }
       visited.add(current);
