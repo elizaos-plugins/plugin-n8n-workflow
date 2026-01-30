@@ -7,7 +7,7 @@
  * Requires n8n-nodes-base as a devDependency.
  * Run with: bun run crawl-nodes
  */
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const OUTPUT = path.resolve(import.meta.dir, '..', 'src', 'data', 'defaultNodes.json');
@@ -59,6 +59,7 @@ async function main() {
     nodes.push(filtered);
   }
 
+  await mkdir(path.dirname(OUTPUT), { recursive: true });
   await writeFile(OUTPUT, JSON.stringify(nodes, null, 2), 'utf-8');
   console.log(`Wrote ${nodes.length} unique nodes to ${OUTPUT}`);
 }
