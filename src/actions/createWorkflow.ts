@@ -17,13 +17,17 @@ const DRAFT_TTL_MS = 30 * 60 * 1000;
 
 function buildFlowChain(connections: N8nConnections): string {
   const connectionNames = Object.keys(connections);
-  if (connectionNames.length === 0) return '';
+  if (connectionNames.length === 0) {
+    return '';
+  }
 
   const targets = new Set<string>();
   for (const sourceName of connectionNames) {
     for (const outputType of Object.values(connections[sourceName])) {
       for (const conns of outputType) {
-        for (const conn of conns) targets.add(conn.node);
+        for (const conn of conns) {
+          targets.add(conn.node);
+        }
       }
     }
   }
@@ -35,7 +39,9 @@ function buildFlowChain(connections: N8nConnections): string {
 
   while (queue.length > 0) {
     const current = queue.shift();
-    if (!current || visited.has(current)) continue;
+    if (!current || visited.has(current)) {
+      continue;
+    }
     visited.add(current);
     flowParts.push(current);
 
@@ -43,7 +49,9 @@ function buildFlowChain(connections: N8nConnections): string {
     if (outputs) {
       for (const outputType of Object.values(outputs)) {
         for (const conns of outputType) {
-          for (const conn of conns) queue.push(conn.node);
+          for (const conn of conns) {
+            queue.push(conn.node);
+          }
         }
       }
     }
@@ -56,7 +64,9 @@ function buildPreviewData(workflow: N8nWorkflow): Record<string, unknown> {
   const creds = new Set<string>();
   for (const node of workflow.nodes) {
     if (node.credentials) {
-      for (const c of Object.keys(node.credentials)) creds.add(c);
+      for (const c of Object.keys(node.credentials)) {
+        creds.add(c);
+      }
     }
   }
 
@@ -301,7 +311,9 @@ export const createWorkflowAction: Action = {
                   ...(m.authUrl && { authUrl: m.authUrl }),
                 })),
               });
-              if (callback) await callback({ text });
+              if (callback) {
+                await callback({ text });
+              }
               return { success: true };
             }
 
@@ -313,7 +325,9 @@ export const createWorkflowAction: Action = {
               nodeCount: result.nodeCount,
               active: result.active,
             });
-            if (callback) await callback({ text });
+            if (callback) {
+              await callback({ text });
+            }
             return { success: true, data: result };
           }
 
@@ -322,7 +336,9 @@ export const createWorkflowAction: Action = {
             const text = await formatActionResponse(runtime, 'CANCELLED', {
               workflowName: existingDraft.workflow.name,
             });
-            if (callback) await callback({ text });
+            if (callback) {
+              await callback({ text });
+            }
             return { success: true };
           }
 
@@ -350,7 +366,9 @@ export const createWorkflowAction: Action = {
               const text = await formatActionResponse(runtime, 'CLARIFICATION', {
                 questions: modifiedWorkflow._meta.requiresClarification,
               });
-              if (callback) await callback({ text });
+              if (callback) {
+                await callback({ text });
+              }
               return { success: true };
             }
 
@@ -359,14 +377,18 @@ export const createWorkflowAction: Action = {
               'PREVIEW',
               buildPreviewData(modifiedWorkflow)
             );
-            if (callback) await callback({ text });
+            if (callback) {
+              await callback({ text });
+            }
             return { success: true };
           }
 
           case 'new': {
             if (!userText) {
               const text = await formatActionResponse(runtime, 'EMPTY_PROMPT', {});
-              if (callback) await callback({ text });
+              if (callback) {
+                await callback({ text });
+              }
               await runtime.deleteCache(cacheKey);
               return { success: false };
             }
@@ -392,7 +414,9 @@ export const createWorkflowAction: Action = {
                 ...buildPreviewData(existingDraft.workflow),
                 restoredAfterFailure: true,
               });
-              if (callback) await callback({ text });
+              if (callback) {
+                await callback({ text });
+              }
               return { success: true };
             }
           }
@@ -407,7 +431,9 @@ export const createWorkflowAction: Action = {
               'PREVIEW',
               buildPreviewData(existingDraft.workflow)
             );
-            if (callback) await callback({ text });
+            if (callback) {
+              await callback({ text });
+            }
             return { success: true };
           }
         }
@@ -415,7 +441,9 @@ export const createWorkflowAction: Action = {
 
       if (!userText) {
         const text = await formatActionResponse(runtime, 'EMPTY_PROMPT', {});
-        if (callback) await callback({ text });
+        if (callback) {
+          await callback({ text });
+        }
         return { success: false };
       }
 
@@ -428,7 +456,9 @@ export const createWorkflowAction: Action = {
       );
 
       const text = await formatActionResponse(runtime, 'ERROR', { error: errorMessage });
-      if (callback) await callback({ text });
+      if (callback) {
+        await callback({ text });
+      }
       return { success: false };
     }
   },
@@ -463,11 +493,15 @@ async function generateAndPreview(
     const text = await formatActionResponse(runtime, 'CLARIFICATION', {
       questions: workflow._meta.requiresClarification,
     });
-    if (callback) await callback({ text });
+    if (callback) {
+      await callback({ text });
+    }
     return { success: true };
   }
 
   const text = await formatActionResponse(runtime, 'PREVIEW', buildPreviewData(workflow));
-  if (callback) await callback({ text });
+  if (callback) {
+    await callback({ text });
+  }
   return { success: true };
 }
