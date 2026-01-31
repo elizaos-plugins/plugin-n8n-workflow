@@ -128,24 +128,29 @@ export const activateWorkflowAction: Action = {
         );
 
         const result = await service.deployWorkflow(pendingDraft.workflow, message.entityId);
+
+        // Deploy blocked — unresolved credentials
+        if (result.missingCredentials.length > 0) {
+          const connList = result.missingCredentials
+            .map((m) =>
+              m.authUrl ? `- **${m.credType}**: [Connect](${m.authUrl})` : `- **${m.credType}**`
+            )
+            .join('\n');
+          if (callback) {
+            await callback({
+              text: `The following services need to be connected before deploying:\n\n${connList}\n\nPlease connect them and try again.`,
+            });
+          }
+          return { success: true };
+        }
+
         await runtime.deleteCache(cacheKey);
 
         let responseText = `Workflow "${result.name}" deployed successfully!\n\n`;
         responseText += `**Workflow ID:** ${result.id}\n`;
         responseText += `**Nodes:** ${result.nodeCount}\n`;
         responseText += `**Status:** ${result.active ? 'Active' : 'Inactive'}\n`;
-
-        if (result.missingCredentials.length > 0) {
-          responseText += '\n**Action Required:**\n';
-          responseText += 'Please connect the following services in n8n Cloud:\n';
-          for (const credType of result.missingCredentials) {
-            responseText += `- \`${credType}\`\n`;
-          }
-          responseText +=
-            '\nThe workflow will be ready to run once these connections are configured.';
-        } else {
-          responseText += '\nAll credentials configured — workflow is ready to run!';
-        }
+        responseText += '\nAll credentials configured — workflow is ready to run!';
 
         if (callback) {
           await callback({ text: responseText });

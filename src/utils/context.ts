@@ -1,10 +1,5 @@
 import { type IAgentRuntime, type Memory, type State, type UUID } from '@elizaos/core';
 
-/**
- * Build conversation context from recent messages
- *
- * Takes last 5 messages from state and formats them for LLM context.
- */
 export function buildConversationContext(
   runtime: IAgentRuntime,
   message: Memory,
@@ -24,10 +19,6 @@ export function buildConversationContext(
   return `Recent conversation:\n${context}\n\nCurrent request: ${message.content.text || ''}`;
 }
 
-/**
- * Build a short, unique n8n tag name for a user.
- * Uses entity display name if available, otherwise falls back to a short UUID prefix.
- */
 export async function getUserTagName(runtime: IAgentRuntime, userId: string): Promise<string> {
   const entity = await runtime.getEntityById(userId as UUID);
   const shortId = userId.replace(/-/g, '').slice(0, 8);

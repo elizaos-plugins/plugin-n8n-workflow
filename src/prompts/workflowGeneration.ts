@@ -1,7 +1,3 @@
-/**
- * System prompt for n8n workflow generation
- */
-
 export const WORKFLOW_GENERATION_SYSTEM_PROMPT = `## n8n Workflow AI Definition: Core Concepts
 
 ### 1. **Workflow**

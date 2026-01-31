@@ -11,6 +11,7 @@ import {
   KEYWORD_EXTRACTION_SYSTEM_PROMPT,
   WORKFLOW_GENERATION_SYSTEM_PROMPT,
   DRAFT_INTENT_SYSTEM_PROMPT,
+  ACTION_RESPONSE_SYSTEM_PROMPT,
 } from '../prompts/index';
 import { WORKFLOW_MATCHING_SYSTEM_PROMPT } from '../prompts/workflowMatching';
 import {
@@ -20,20 +21,6 @@ import {
 } from '../schemas/index';
 import { getNodeDefinition } from './catalog';
 
-/**
- * Extracts keywords from user prompt using LLM
- * Adapted from n8n-intelligence to use ElizaOS runtime
- *
- * @param runtime - ElizaOS runtime for model access
- * @param userPrompt - User's workflow description
- * @returns Array of 1-5 keywords for node search
- *
- * @example
- * ```typescript
- * const keywords = await extractKeywords(runtime, "Send Stripe summaries via Gmail");
- * // Returns: ["stripe", "gmail", "send", "email"]
- * ```
- */
 export async function extractKeywords(
   runtime: IAgentRuntime,
   userPrompt: string
@@ -60,14 +47,6 @@ export async function extractKeywords(
     .filter((kw) => kw.length > 0);
 }
 
-/**
- * Match user request to available workflows using LLM semantic matching with conversation context
- *
- * @param runtime - Agent runtime with LLM access
- * @param userRequest - User's current message (for context-aware matching, include conversation history)
- * @param workflows - List of available workflows
- * @returns Match result with workflow ID and confidence
- */
 export async function matchWorkflow(
   runtime: IAgentRuntime,
   userRequest: string,
@@ -123,17 +102,6 @@ ${workflowList}`;
   }
 }
 
-/**
- * Classify user intent when a workflow draft exists in cache
- *
- * The LLM determines whether the user wants to confirm, cancel, modify, or create a new workflow
- * based on their message and the existing draft context.
- *
- * @param runtime - ElizaOS runtime for model access
- * @param userMessage - User's current message
- * @param draft - The existing workflow draft from cache
- * @returns Intent classification with optional modification request
- */
 export async function classifyDraftIntent(
   runtime: IAgentRuntime,
   userMessage: string,
@@ -186,10 +154,6 @@ ${userMessage}`,
   return result;
 }
 
-/**
- * Parse LLM response into an N8nWorkflow object.
- * Strips markdown code fences and validates basic structure.
- */
 function parseWorkflowResponse(response: string): N8nWorkflow {
   const cleaned = response
     .replace(/^```json\s*/i, '')
@@ -217,14 +181,6 @@ function parseWorkflowResponse(response: string): N8nWorkflow {
   return workflow;
 }
 
-/**
- * Generate n8n workflow from natural language using LLM
- *
- * @param runtime - ElizaOS runtime for model access
- * @param userPrompt - User's workflow description
- * @param relevantNodes - Nodes found by keyword search
- * @returns Generated workflow JSON
- */
 export async function generateWorkflow(
   runtime: IAgentRuntime,
   userPrompt: string,
@@ -259,19 +215,6 @@ Generate a valid n8n workflow JSON that fulfills this request.`;
   return workflow;
 }
 
-/**
- * Modify an existing n8n workflow based on user instructions.
- *
- * Sends the existing workflow JSON + modification instructions to the LLM,
- * which patches the workflow (add/remove/change nodes, connections, parameters).
- * Reuses WORKFLOW_GENERATION_SYSTEM_PROMPT so the LLM has full n8n knowledge.
- *
- * @param runtime - ElizaOS runtime for model access
- * @param existingWorkflow - The current workflow to modify
- * @param modificationRequest - What the user wants changed
- * @param relevantNodes - Node definitions (existing + any new ones from keyword search)
- * @returns Modified workflow JSON
- */
 export async function modifyWorkflow(
   runtime: IAgentRuntime,
   existingWorkflow: N8nWorkflow,
@@ -308,10 +251,6 @@ Keep all unchanged nodes and connections intact. Only add, remove, or change wha
   return parseWorkflowResponse(response);
 }
 
-/**
- * Collect node definitions for all nodes already in a workflow.
- * Used to give the LLM full context about existing nodes during modification.
- */
 export function collectExistingNodeDefinitions(workflow: N8nWorkflow): NodeDefinition[] {
   const defs: NodeDefinition[] = [];
   const seen = new Set<string>();
@@ -334,4 +273,16 @@ export function collectExistingNodeDefinitions(workflow: N8nWorkflow): NodeDefin
   }
 
   return defs;
+}
+
+export async function formatActionResponse(
+  runtime: IAgentRuntime,
+  responseType: string,
+  data: Record<string, unknown>
+): Promise<string> {
+  const response = await runtime.useModel(ModelType.TEXT_SMALL, {
+    prompt: `${ACTION_RESPONSE_SYSTEM_PROMPT}\n\nType: ${responseType}\n\n${JSON.stringify(data)}`,
+  });
+
+  return (response as string).trim();
 }

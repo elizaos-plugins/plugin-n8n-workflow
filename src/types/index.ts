@@ -94,22 +94,6 @@ export interface N8nCredential {
   updatedAt: string;
 }
 
-export interface N8nCredentialSchema {
-  type: 'object';
-  additionalProperties: boolean;
-  properties: Record<
-    string,
-    {
-      type: string;
-      displayName?: string;
-      default?: unknown;
-      required?: boolean;
-      description?: string;
-    }
-  >;
-  required?: string[];
-}
-
 export interface N8nExecution {
   id: string;
   finished: boolean;
@@ -235,52 +219,39 @@ export interface WorkflowValidationResult {
   fixedWorkflow?: N8nWorkflow;
 }
 
-// Credential management types (for cloud mode)
+// Credential provider types
 
-export interface UserTokens {
-  accessToken: string;
-  refreshToken?: string;
-  expiresAt?: Date;
-  expiresIn?: number;
-  scope?: string;
-  tokenType?: string;
-  apiKey?: string; // For non-OAuth providers like Stripe
-  domain?: string; // For providers like Freshdesk
-  metadata?: Record<string, unknown>;
+export const N8N_CREDENTIAL_PROVIDER_TYPE = 'n8n_credential_provider';
+
+/**
+ * Result of a credential resolution attempt by an external provider.
+ */
+export type CredentialProviderResult =
+  | { status: 'resolved'; credentialId: string }
+  | { status: 'needs_auth'; authUrl: string }
+  | null;
+
+/**
+ * External credential provider interface.
+ *
+ * Hosts (e.g. eliza-cloud) can register a service implementing this interface
+ * to automatically resolve credentials (via OAuth, API keys, etc.).
+ * The plugin works without one — it's an optional enhancement.
+ *
+ * Register on runtime as service type 'n8n_credential_provider'.
+ */
+export interface CredentialProvider {
+  resolve(userId: string, credType: string): Promise<CredentialProviderResult>;
 }
 
 /**
- * Duck-typed OAuth service interface.
- * Any service with serviceType = "oauth" implementing these methods will work.
- * Used for cloud mode with automatic OAuth credential injection.
- *
+ * Type guard to check if a service implements CredentialProvider
  */
-export type OAuthService = {
-  getAuthUrl(userId: string, provider: string, scopes: string[]): Promise<string>;
-  hasConnection(userId: string, credType: string): Promise<boolean>;
-  getTokens(userId: string, credType: string): Promise<UserTokens | null>;
-  getOAuthAppConfig?(provider: string): Promise<{
-    clientId: string;
-    clientSecret: string;
-    scope?: string;
-  }>;
-};
-
-/**
- * Type guard to check if a service implements OAuthService interface
- */
-export function isOAuthService(service: unknown): service is OAuthService {
+export function isCredentialProvider(service: unknown): service is CredentialProvider {
   if (!service || typeof service !== 'object') {
     return false;
   }
-
-  const s = service as Record<string, unknown>;
-
-  return (
-    typeof s.getAuthUrl === 'function' &&
-    typeof s.hasConnection === 'function' &&
-    typeof s.getTokens === 'function'
-  );
+  return typeof (service as Record<string, unknown>).resolve === 'function';
 }
 
 // Credential store types
@@ -302,7 +273,7 @@ export interface CredentialResolutionResult {
 
 export interface MissingConnection {
   credType: string;
-  oauthUrl?: string; // Only in cloud mode
+  authUrl?: string;
 }
 
 // Plugin configuration types
@@ -333,7 +304,7 @@ export interface WorkflowCreationResult extends Record<string, unknown> {
   name: string;
   active: boolean;
   nodeCount: number;
-  missingCredentials: string[];
+  missingCredentials: MissingConnection[];
 }
 
 // Error types

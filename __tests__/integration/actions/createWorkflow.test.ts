@@ -6,6 +6,7 @@ import {
   createMockMessage,
   createMockState,
   createMockCallback,
+  createUseModelMock,
 } from '../../helpers/mockRuntime';
 import { createMockService } from '../../helpers/mockService';
 import type { WorkflowDraft } from '../../../src/types/index';
@@ -52,12 +53,12 @@ describe('CREATE_N8N_WORKFLOW action', () => {
       expect(mockService.generateWorkflowDraft).toHaveBeenCalledTimes(1);
       expect(mockService.deployWorkflow).not.toHaveBeenCalled();
 
-      // Should show preview in callback
+      // Callback called with LLM-formatted text containing workflow data
       const calls = (callback as any).mock.calls;
+      expect(calls.length).toBeGreaterThan(0);
       const lastText = calls[calls.length - 1][0].text;
-      expect(lastText).toContain('Workflow Preview');
-      expect(lastText).toContain('Generated Workflow');
-      expect(lastText).toContain('confirm');
+      expect(lastText).toContain('Generated Workflow'); // workflow name in data
+      expect(lastText).toContain('scheduleTrigger'); // node type in data
 
       // Should store draft in cache
       expect(runtime.setCache).toHaveBeenCalled();
@@ -109,7 +110,7 @@ describe('CREATE_N8N_WORKFLOW action', () => {
       expect(result.success).toBe(true);
       const calls = (callback as any).mock.calls;
       const lastText = calls[calls.length - 1][0].text;
-      expect(lastText).toContain('more information');
+      // Clarification questions should be in the data passed to the LLM
       expect(lastText).toContain('What specific task');
       expect(lastText).toContain('Which services');
     });
@@ -130,8 +131,8 @@ describe('CREATE_N8N_WORKFLOW action', () => {
       );
 
       expect(result.success).toBe(false);
-      const callbackText = (callback as any).mock.calls[0][0].text;
-      expect(callbackText).toContain('description');
+      // Callback should be called (LLM formats EMPTY_PROMPT response)
+      expect((callback as any).mock.calls.length).toBeGreaterThan(0);
     });
 
     test('fails when service is unavailable', async () => {
@@ -219,16 +220,9 @@ describe('CREATE_N8N_WORKFLOW action', () => {
       const draft = createDraftInCache();
       const mockService = createMockService();
 
-      const useModel = mock(() =>
-        Promise.resolve({
-          intent: 'confirm',
-          reason: 'User agreed to deploy',
-        })
-      );
-
       const runtime = createMockRuntime({
         services: { [N8N_WORKFLOW_SERVICE_TYPE]: mockService },
-        useModel,
+        useModel: createUseModelMock({ intent: 'confirm', reason: 'User agreed to deploy' }),
         cache: { 'workflow_draft:user-001': draft },
       });
 
@@ -253,24 +247,19 @@ describe('CREATE_N8N_WORKFLOW action', () => {
       // Should clear cache
       expect(runtime.deleteCache).toHaveBeenCalled();
 
-      // Should show deployment success
+      // Should show deployment data in callback
       const calls = (callback as any).mock.calls;
       const lastText = calls[calls.length - 1][0].text;
-      expect(lastText).toContain('deployed successfully');
+      expect(lastText).toContain('wf-001'); // workflow ID
+      expect(lastText).toContain('Generated Workflow'); // workflow name
     });
 
     test('cancels draft on cancel intent', async () => {
       const draft = createDraftInCache();
-      const useModel = mock(() =>
-        Promise.resolve({
-          intent: 'cancel',
-          reason: 'User rejected',
-        })
-      );
 
       const runtime = createMockRuntime({
         services: { [N8N_WORKFLOW_SERVICE_TYPE]: createMockService() },
-        useModel,
+        useModel: createUseModelMock({ intent: 'cancel', reason: 'User rejected' }),
         cache: { 'workflow_draft:user-001': draft },
       });
 
@@ -290,26 +279,23 @@ describe('CREATE_N8N_WORKFLOW action', () => {
       expect(result.success).toBe(true);
       expect(runtime.deleteCache).toHaveBeenCalled();
 
+      // Callback called with cancelled response containing workflow name
       const calls = (callback as any).mock.calls;
       const lastText = calls[calls.length - 1][0].text;
-      expect(lastText).toContain('cancelled');
+      expect(lastText).toContain('Stripe Gmail Summary');
     });
 
     test('modifies draft using existing workflow on modify intent', async () => {
       const draft = createDraftInCache();
       const mockService = createMockService();
 
-      const useModel = mock(() =>
-        Promise.resolve({
+      const runtime = createMockRuntime({
+        services: { [N8N_WORKFLOW_SERVICE_TYPE]: mockService },
+        useModel: createUseModelMock({
           intent: 'modify',
           modificationRequest: 'Use Outlook instead of Gmail',
           reason: 'User wants different email service',
-        })
-      );
-
-      const runtime = createMockRuntime({
-        services: { [N8N_WORKFLOW_SERVICE_TYPE]: mockService },
-        useModel,
+        }),
         cache: { 'workflow_draft:user-001': draft },
       });
 
@@ -337,11 +323,10 @@ describe('CREATE_N8N_WORKFLOW action', () => {
       expect(modifyCall[0]).toEqual(draft.workflow); // existing workflow
       expect(modifyCall[1]).toBe('Use Outlook instead of Gmail'); // modification
 
-      // Should show preview with modified workflow
+      // Should show preview with modified workflow data
       const calls = (callback as any).mock.calls;
       const lastText = calls[calls.length - 1][0].text;
-      expect(lastText).toContain('Workflow Preview');
-      expect(lastText).toContain('Modified Workflow');
+      expect(lastText).toContain('Modified Workflow'); // modified workflow name
 
       // Should store updated draft in cache
       expect(runtime.setCache).toHaveBeenCalled();
@@ -374,16 +359,9 @@ describe('CREATE_N8N_WORKFLOW action', () => {
         generateWorkflowDraft: mock(() => Promise.reject(new Error('No relevant n8n nodes found'))),
       });
 
-      const useModel = mock(() =>
-        Promise.resolve({
-          intent: 'new',
-          reason: 'User wants a different workflow',
-        })
-      );
-
       const runtime = createMockRuntime({
         services: { [N8N_WORKFLOW_SERVICE_TYPE]: mockService },
-        useModel,
+        useModel: createUseModelMock({ intent: 'new', reason: 'User wants a different workflow' }),
         cache: { 'workflow_draft:user-001': draft },
       });
 
@@ -405,16 +383,14 @@ describe('CREATE_N8N_WORKFLOW action', () => {
       // Draft should be restored in cache
       expect(runtime.setCache).toHaveBeenCalled();
 
-      // Should show the original draft preview
+      // Should show the original draft data in the restored preview
       const calls = (callback as any).mock.calls;
       const lastText = calls[calls.length - 1][0].text;
       expect(lastText).toContain('Stripe Gmail Summary');
-      expect(lastText).toContain('current draft');
     });
 
     test('overrides confirm to modify when draft has pending clarifications', async () => {
       const draft = createDraftInCache();
-      // Add pending clarification to the draft workflow
       draft.workflow._meta = {
         assumptions: [],
         suggestions: [],
@@ -422,16 +398,10 @@ describe('CREATE_N8N_WORKFLOW action', () => {
       };
 
       const mockService = createMockService();
-      const useModel = mock(() =>
-        Promise.resolve({
-          intent: 'confirm',
-          reason: 'User said yes',
-        })
-      );
 
       const runtime = createMockRuntime({
         services: { [N8N_WORKFLOW_SERVICE_TYPE]: mockService },
-        useModel,
+        useModel: createUseModelMock({ intent: 'confirm', reason: 'User said yes' }),
         cache: { 'workflow_draft:user-001': draft },
       });
 
@@ -454,7 +424,7 @@ describe('CREATE_N8N_WORKFLOW action', () => {
       expect(mockService.deployWorkflow).not.toHaveBeenCalled();
     });
 
-    test('reports missing credentials after deploy', async () => {
+    test('blocks deploy when credentials are missing (no auth URL)', async () => {
       const draft = createDraftInCache();
       const mockService = createMockService({
         deployWorkflow: mock(() =>
@@ -463,21 +433,14 @@ describe('CREATE_N8N_WORKFLOW action', () => {
             name: 'Test',
             active: false,
             nodeCount: 2,
-            missingCredentials: ['gmailOAuth2Api', 'stripeApi'],
+            missingCredentials: [{ credType: 'gmailOAuth2Api' }, { credType: 'stripeApi' }],
           })
         ),
       });
 
-      const useModel = mock(() =>
-        Promise.resolve({
-          intent: 'confirm',
-          reason: 'User confirmed',
-        })
-      );
-
       const runtime = createMockRuntime({
         services: { [N8N_WORKFLOW_SERVICE_TYPE]: mockService },
-        useModel,
+        useModel: createUseModelMock({ intent: 'confirm', reason: 'User confirmed' }),
         cache: { 'workflow_draft:user-001': draft },
       });
 
@@ -490,6 +453,56 @@ describe('CREATE_N8N_WORKFLOW action', () => {
 
       const calls = (callback as any).mock.calls;
       const resultText = calls[calls.length - 1][0].text;
+      expect(resultText).toContain('gmailOAuth2Api');
+      expect(resultText).toContain('stripeApi');
+    });
+
+    test('blocks deploy and shows auth links when credentials need authentication', async () => {
+      const draft = createDraftInCache();
+      const mockService = createMockService({
+        deployWorkflow: mock(() =>
+          Promise.resolve({
+            id: '',
+            name: 'Stripe Gmail Summary',
+            active: false,
+            nodeCount: 2,
+            missingCredentials: [
+              { credType: 'gmailOAuth2Api', authUrl: 'https://auth.example.com/gmail' },
+              { credType: 'stripeApi', authUrl: 'https://auth.example.com/stripe' },
+            ],
+          })
+        ),
+      });
+
+      const runtime = createMockRuntime({
+        services: { [N8N_WORKFLOW_SERVICE_TYPE]: mockService },
+        useModel: createUseModelMock({ intent: 'confirm', reason: 'User confirmed' }),
+        cache: { 'workflow_draft:user-001': draft },
+      });
+
+      const message = createMockMessage({
+        content: { text: 'Deploy it' },
+      });
+      const callback = createMockCallback();
+
+      const result = await createWorkflowAction.handler(
+        runtime,
+        message,
+        createMockState(),
+        {},
+        callback
+      );
+
+      expect(result.success).toBe(true);
+
+      // Should NOT clear cache — draft stays for retry after auth
+      expect(runtime.deleteCache).not.toHaveBeenCalled();
+
+      // Should show auth URLs in callback
+      const calls = (callback as any).mock.calls;
+      const resultText = calls[calls.length - 1][0].text;
+      expect(resultText).toContain('https://auth.example.com/gmail');
+      expect(resultText).toContain('https://auth.example.com/stripe');
       expect(resultText).toContain('gmailOAuth2Api');
       expect(resultText).toContain('stripeApi');
     });

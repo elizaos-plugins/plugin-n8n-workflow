@@ -20,13 +20,16 @@ import type {
   N8nWorkflowResponse,
   N8nExecution,
   WorkflowCreationResult,
+  N8nCredentialStoreApi,
+} from '../types/index';
+import {
+  N8N_CREDENTIAL_STORE_TYPE,
+  N8N_CREDENTIAL_PROVIDER_TYPE,
+  isCredentialProvider,
 } from '../types/index';
 
 export const N8N_WORKFLOW_SERVICE_TYPE = 'n8n_workflow';
 
-/**
- * Configuration for the N8n Workflow Service
- */
 export interface N8nWorkflowServiceConfig {
   apiKey: string;
   host: string;
@@ -49,9 +52,6 @@ export class N8nWorkflowService extends Service {
   private apiClient: N8nApiClient | null = null;
   private serviceConfig: N8nWorkflowServiceConfig | null = null;
 
-  /**
-   * Start the N8n Workflow Service
-   */
   static async start(runtime: IAgentRuntime): Promise<N8nWorkflowService> {
     logger.info({ src: 'plugin:n8n-workflow:service:main' }, 'Starting N8n Workflow Service...');
 
@@ -110,10 +110,6 @@ export class N8nWorkflowService extends Service {
     logger.info({ src: 'plugin:n8n-workflow:service:main' }, 'N8n Workflow Service stopped');
   }
 
-  /**
-   * Check generated workflow against node catalog and inject clarification
-   * questions for missing required parameters or disconnected inputs.
-   */
   private injectCatalogClarifications(workflow: N8nWorkflow): void {
     const paramWarnings = validateNodeParameters(workflow);
     const inputWarnings = validateNodeInputs(workflow);
@@ -135,9 +131,6 @@ export class N8nWorkflowService extends Service {
     }
   }
 
-  /**
-   * Get the API client (throws if service not initialized)
-   */
   private getClient(): N8nApiClient {
     if (!this.apiClient) {
       throw new Error('N8n Workflow Service not initialized');
@@ -145,9 +138,6 @@ export class N8nWorkflowService extends Service {
     return this.apiClient;
   }
 
-  /**
-   * Get the service configuration (throws if service not initialized)
-   */
   private getConfig(): N8nWorkflowServiceConfig {
     if (!this.serviceConfig) {
       throw new Error('N8n Workflow Service not initialized');
@@ -155,10 +145,6 @@ export class N8nWorkflowService extends Service {
     return this.serviceConfig;
   }
 
-  /**
-   * Generate a workflow draft from natural language.
-   * Does NOT resolve credentials or deploy — returns a preview-ready workflow.
-   */
   async generateWorkflowDraft(prompt: string): Promise<N8nWorkflow> {
     logger.info(
       { src: 'plugin:n8n-workflow:service:main' },
@@ -212,11 +198,6 @@ export class N8nWorkflowService extends Service {
     return positionNodes(workflow);
   }
 
-  /**
-   * Modify an existing workflow draft based on user instructions.
-   * Searches for new nodes mentioned in the modification, combines with existing node defs,
-   * then asks the LLM to patch the workflow.
-   */
   async modifyWorkflowDraft(
     existingWorkflow: N8nWorkflow,
     modificationRequest: string
@@ -269,10 +250,6 @@ export class N8nWorkflowService extends Service {
     return positionNodes(workflow);
   }
 
-  /**
-   * Deploy a previously generated workflow.
-   * Resolves credentials and creates the workflow via n8n API.
-   */
   async deployWorkflow(workflow: N8nWorkflow, userId: string): Promise<WorkflowCreationResult> {
     logger.info(
       { src: 'plugin:n8n-workflow:service:main' },
@@ -281,13 +258,32 @@ export class N8nWorkflowService extends Service {
 
     const config = this.getConfig();
     const client = this.getClient();
+
+    const credStore = this.runtime.getService(N8N_CREDENTIAL_STORE_TYPE) as unknown as
+      | N8nCredentialStoreApi
+      | undefined;
+
+    const rawProvider = this.runtime.getService(N8N_CREDENTIAL_PROVIDER_TYPE);
+    const credProvider = isCredentialProvider(rawProvider) ? rawProvider : null;
+
     const credentialResult = await resolveCredentials(
       workflow,
       userId,
-      this.runtime,
-      client,
-      config
+      config,
+      credStore ?? null,
+      credProvider
     );
+
+    // Block deploy if any credential is unresolved
+    if (credentialResult.missingConnections.length > 0) {
+      return {
+        id: '',
+        name: workflow.name,
+        active: false,
+        nodeCount: workflow.nodes.length,
+        missingCredentials: credentialResult.missingConnections,
+      };
+    }
 
     const createdWorkflow = await client.createWorkflow(credentialResult.workflow);
 
@@ -334,13 +330,10 @@ export class N8nWorkflowService extends Service {
       name: createdWorkflow.name,
       active,
       nodeCount: createdWorkflow.nodes?.length || 0,
-      missingCredentials: credentialResult.missingConnections.map((m) => m.credType),
+      missingCredentials: credentialResult.missingConnections,
     };
   }
 
-  /**
-   * List workflows (optionally filtered by user)
-   */
   async listWorkflows(userId?: string): Promise<N8nWorkflowResponse[]> {
     const client = this.getClient();
 
@@ -362,45 +355,30 @@ export class N8nWorkflowService extends Service {
     return response.data;
   }
 
-  /**
-   * Activate a workflow
-   */
   async activateWorkflow(workflowId: string): Promise<void> {
     const client = this.getClient();
     await client.activateWorkflow(workflowId);
     logger.info({ src: 'plugin:n8n-workflow:service:main' }, `Workflow ${workflowId} activated`);
   }
 
-  /**
-   * Deactivate a workflow
-   */
   async deactivateWorkflow(workflowId: string): Promise<void> {
     const client = this.getClient();
     await client.deactivateWorkflow(workflowId);
     logger.info({ src: 'plugin:n8n-workflow:service:main' }, `Workflow ${workflowId} deactivated`);
   }
 
-  /**
-   * Delete a workflow
-   */
   async deleteWorkflow(workflowId: string): Promise<void> {
     const client = this.getClient();
     await client.deleteWorkflow(workflowId);
     logger.info({ src: 'plugin:n8n-workflow:service:main' }, `Workflow ${workflowId} deleted`);
   }
 
-  /**
-   * Get execution history for a workflow
-   */
   async getWorkflowExecutions(workflowId: string, limit?: number): Promise<N8nExecution[]> {
     const client = this.getClient();
     const response = await client.listExecutions({ workflowId, limit });
     return response.data;
   }
 
-  /**
-   * Get detailed execution information
-   */
   async getExecutionDetail(executionId: string): Promise<N8nExecution> {
     const client = this.getClient();
     return client.getExecution(executionId);

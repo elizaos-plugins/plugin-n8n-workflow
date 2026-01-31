@@ -1,12 +1,6 @@
 import type { N8nWorkflow, NodeProperty, WorkflowValidationResult } from '../types/index';
 import { getNodeDefinition } from './catalog';
 
-/**
- * Validate workflow structure and auto-fix common issues
- *
- * @param workflow - Generated workflow to validate
- * @returns Validation result with errors, warnings, and optionally fixed workflow
- */
 export function validateWorkflow(workflow: N8nWorkflow): WorkflowValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -151,15 +145,6 @@ export function validateWorkflow(workflow: N8nWorkflow): WorkflowValidationResul
   };
 }
 
-/**
- * Validate node parameters against the catalog definitions.
- *
- * For each node, looks up its type in the catalog and checks that all
- * required properties (respecting `displayOptions`) are present in the
- * node's `parameters` object.
- *
- * @returns Array of human-readable warnings for missing required parameters
- */
 export function validateNodeParameters(workflow: N8nWorkflow): string[] {
   const warnings: string[] = [];
 
@@ -189,11 +174,9 @@ export function validateNodeParameters(workflow: N8nWorkflow): string[] {
 }
 
 /**
- * Check if a node property is visible given the current parameter values.
- *
- * n8n uses `displayOptions` to conditionally show/hide parameters:
- * - `show`: ALL conditions must match for the property to be visible
- * - `hide`: ANY condition matching hides the property
+ * n8n displayOptions logic:
+ * - `show`: ALL conditions must match for visible
+ * - `hide`: ANY match hides the property
  */
 function isPropertyVisible(prop: NodeProperty, parameters: Record<string, unknown>): boolean {
   if (!prop.displayOptions) {
@@ -234,14 +217,6 @@ function isPropertyVisible(prop: NodeProperty, parameters: Record<string, unknow
   return true;
 }
 
-/**
- * Validate that nodes have the expected number of incoming connections
- * based on their catalog definition's `inputs` array.
- *
- * For example, a Merge node with `inputs: ["main", "main"]` needs 2 incoming connections.
- *
- * @returns Array of warnings for nodes with fewer connections than expected
- */
 export function validateNodeInputs(workflow: N8nWorkflow): string[] {
   const warnings: string[] = [];
 
@@ -288,11 +263,6 @@ export function validateNodeInputs(workflow: N8nWorkflow): string[] {
   return warnings;
 }
 
-/**
- * Auto-fix common workflow issues
- * - Add missing node positions
- * - Fix duplicate node names
- */
 function autoFixWorkflow(workflow: N8nWorkflow): N8nWorkflow {
   const fixed = { ...workflow };
   fixed.nodes = [...workflow.nodes];
@@ -316,18 +286,6 @@ function autoFixWorkflow(workflow: N8nWorkflow): N8nWorkflow {
   return fixed;
 }
 
-/**
- * Auto-position nodes on workflow canvas
- * Adapted from n8n-workflow-builder positioning logic
- *
- * Creates a left-to-right flow layout:
- * - Start at [250, 300]
- * - Advance X by 250px per node
- * - Branch nodes offset Y by 200px
- *
- * @param workflow - Workflow with potentially missing node positions
- * @returns Workflow with all nodes positioned
- */
 export function positionNodes(workflow: N8nWorkflow): N8nWorkflow {
   // Clone workflow
   const positioned = { ...workflow };
@@ -357,9 +315,6 @@ export function positionNodes(workflow: N8nWorkflow): N8nWorkflow {
   return positioned;
 }
 
-/**
- * Build adjacency graph from connections
- */
 function buildNodeGraph(workflow: N8nWorkflow): Map<string, string[]> {
   const graph = new Map<string, string[]>();
 
@@ -388,9 +343,6 @@ function buildNodeGraph(workflow: N8nWorkflow): Map<string, string[]> {
   return graph;
 }
 
-/**
- * Position nodes by levels (breadth-first layout)
- */
 function positionByLevels(
   nodes: N8nWorkflow['nodes'],
   graph: Map<string, string[]>

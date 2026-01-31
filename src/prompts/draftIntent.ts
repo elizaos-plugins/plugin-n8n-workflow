@@ -1,8 +1,3 @@
-/**
- * System prompt for classifying user intent when a workflow draft exists
- * The LLM determines whether the user wants to confirm, cancel, modify, or start a new workflow
- */
-
 export const DRAFT_INTENT_SYSTEM_PROMPT = `You are an assistant managing n8n workflow creation. A workflow draft has been generated and shown to the user as a preview.
 
 Your job: determine what the user wants to do based on their message. The user may write in ANY language — interpret the meaning, not specific keywords.

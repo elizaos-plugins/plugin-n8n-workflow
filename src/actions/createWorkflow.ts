@@ -10,132 +10,67 @@ import {
   type State,
 } from '@elizaos/core';
 import { N8N_WORKFLOW_SERVICE_TYPE, type N8nWorkflowService } from '../services/index';
-import type { N8nWorkflow, WorkflowDraft } from '../types/index';
-import { classifyDraftIntent } from '../utils/generation';
+import type { N8nWorkflow, N8nConnections, WorkflowDraft } from '../types/index';
+import { classifyDraftIntent, formatActionResponse } from '../utils/generation';
 
 const DRAFT_TTL_MS = 30 * 60 * 1000;
 
-/**
- * Build a human-readable preview of a workflow draft
- */
-function formatPreview(workflow: N8nWorkflow): string {
-  const lines: string[] = [];
+function buildFlowChain(connections: N8nConnections): string {
+  const connectionNames = Object.keys(connections);
+  if (connectionNames.length === 0) return '';
 
-  lines.push(`**Workflow Preview: "${workflow.name}"**`);
-  lines.push('');
-
-  // Nodes summary
-  lines.push(`**Nodes (${workflow.nodes.length}):**`);
-  for (let i = 0; i < workflow.nodes.length; i++) {
-    const node = workflow.nodes[i];
-    const typeName = node.type.replace('n8n-nodes-base.', '');
-    lines.push(`  ${i + 1}. **${node.name}** — \`${typeName}\``);
+  const targets = new Set<string>();
+  for (const sourceName of connectionNames) {
+    for (const outputType of Object.values(connections[sourceName])) {
+      for (const conns of outputType) {
+        for (const conn of conns) targets.add(conn.node);
+      }
+    }
   }
-  lines.push('');
 
-  // Flow summary (from connections)
-  const connectionNames = Object.keys(workflow.connections);
-  if (connectionNames.length > 0) {
-    const flowParts: string[] = [];
-    const visited = new Set<string>();
+  const startNodes = connectionNames.filter((n) => !targets.has(n));
+  const queue = startNodes.length > 0 ? [startNodes[0]] : [connectionNames[0]];
+  const flowParts: string[] = [];
+  const visited = new Set<string>();
 
-    // Find the starting node (one that is a source but not a target)
-    const targets = new Set<string>();
-    for (const sourceName of connectionNames) {
-      const outputs = workflow.connections[sourceName];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || visited.has(current)) continue;
+    visited.add(current);
+    flowParts.push(current);
+
+    const outputs = connections[current];
+    if (outputs) {
       for (const outputType of Object.values(outputs)) {
-        for (const connections of outputType) {
-          for (const conn of connections) {
-            targets.add(conn.node);
-          }
+        for (const conns of outputType) {
+          for (const conn of conns) queue.push(conn.node);
         }
       }
     }
-    const startNodes = connectionNames.filter((n) => !targets.has(n));
-    const queue = startNodes.length > 0 ? [startNodes[0]] : [connectionNames[0]];
-
-    while (queue.length > 0) {
-      const current = queue.shift();
-      if (!current || visited.has(current)) {
-        continue;
-      }
-      visited.add(current);
-      flowParts.push(current);
-
-      const outputs = workflow.connections[current];
-      if (outputs) {
-        for (const outputType of Object.values(outputs)) {
-          for (const connections of outputType) {
-            for (const conn of connections) {
-              queue.push(conn.node);
-            }
-          }
-        }
-      }
-    }
-
-    lines.push(`**Flow:** ${flowParts.join(' → ')}`);
-    lines.push('');
   }
 
-  // Credentials needed
-  const credTypes = new Set<string>();
-  for (const node of workflow.nodes) {
-    if (node.credentials) {
-      for (const credType of Object.keys(node.credentials)) {
-        credTypes.add(credType);
-      }
-    }
-  }
-  if (credTypes.size > 0) {
-    lines.push('**Credentials needed:**');
-    for (const cred of credTypes) {
-      lines.push(`  - \`${cred}\``);
-    }
-    lines.push('');
-  }
-
-  // Meta: assumptions
-  if (workflow._meta?.assumptions?.length) {
-    lines.push('**Assumptions made:**');
-    for (const a of workflow._meta.assumptions) {
-      lines.push(`  - ${a}`);
-    }
-    lines.push('');
-  }
-
-  // Meta: suggestions
-  if (workflow._meta?.suggestions?.length) {
-    lines.push('**Suggestions:**');
-    for (const s of workflow._meta.suggestions) {
-      lines.push(`  - ${s}`);
-    }
-    lines.push('');
-  }
-
-  lines.push('---');
-  lines.push('This workflow is a **draft** and has **not been deployed** yet.');
-  lines.push('Reply **confirm** to deploy, **modify** to change, or **cancel** to discard.');
-
-  return lines.join('\n');
+  return flowParts.join(' → ');
 }
 
-/**
- * Format clarification questions from the LLM
- */
-function formatClarification(workflow: N8nWorkflow): string {
-  const questions = workflow._meta?.requiresClarification || [];
-  const lines: string[] = [];
-
-  lines.push('I need a bit more information before I can create this workflow:');
-  lines.push('');
-  for (const q of questions) {
-    lines.push(`- ${q}`);
+function buildPreviewData(workflow: N8nWorkflow): Record<string, unknown> {
+  const creds = new Set<string>();
+  for (const node of workflow.nodes) {
+    if (node.credentials) {
+      for (const c of Object.keys(node.credentials)) creds.add(c);
+    }
   }
-  lines.push('');
-  lines.push("Please provide more details and I'll generate the workflow.");
 
-  return lines.join('\n');
+  return {
+    workflowName: workflow.name,
+    nodes: workflow.nodes.map((n) => ({
+      name: n.name,
+      type: n.type.replace('n8n-nodes-base.', ''),
+    })),
+    flow: buildFlowChain(workflow.connections),
+    credentials: [...creds],
+    ...(workflow._meta?.assumptions?.length && { assumptions: workflow._meta.assumptions }),
+    ...(workflow._meta?.suggestions?.length && { suggestions: workflow._meta.suggestions }),
+  };
 }
 
 const examples: ActionExample[][] = [
@@ -187,69 +122,47 @@ const examples: ActionExample[][] = [
   [
     {
       name: '{{user1}}',
-      content: {
-        text: 'Yes, deploy it',
-      },
+      content: { text: 'Yes, deploy it' },
     },
     {
       name: '{{agent}}',
-      content: {
-        text: 'Deploying your workflow now...',
-        actions: ['CREATE_N8N_WORKFLOW'],
-      },
+      content: { text: 'Deploying your workflow now...', actions: ['CREATE_N8N_WORKFLOW'] },
     },
   ],
   [
     {
       name: '{{user1}}',
-      content: {
-        text: 'Looks good, confirm',
-      },
+      content: { text: 'Looks good, confirm' },
     },
     {
       name: '{{agent}}',
-      content: {
-        text: 'Deploying your workflow...',
-        actions: ['CREATE_N8N_WORKFLOW'],
-      },
+      content: { text: 'Deploying your workflow...', actions: ['CREATE_N8N_WORKFLOW'] },
     },
   ],
   [
     {
       name: '{{user1}}',
-      content: {
-        text: 'Go ahead and create it',
-      },
+      content: { text: 'Go ahead and create it' },
     },
     {
       name: '{{agent}}',
-      content: {
-        text: 'Deploying your workflow...',
-        actions: ['CREATE_N8N_WORKFLOW'],
-      },
+      content: { text: 'Deploying your workflow...', actions: ['CREATE_N8N_WORKFLOW'] },
     },
   ],
   [
     {
       name: '{{user1}}',
-      content: {
-        text: 'Cancel the workflow',
-      },
+      content: { text: 'Cancel the workflow' },
     },
     {
       name: '{{agent}}',
-      content: {
-        text: 'Workflow draft cancelled.',
-        actions: ['CREATE_N8N_WORKFLOW'],
-      },
+      content: { text: 'Workflow draft cancelled.', actions: ['CREATE_N8N_WORKFLOW'] },
     },
   ],
   [
     {
       name: '{{user1}}',
-      content: {
-        text: 'Actually, use Outlook instead of Gmail',
-      },
+      content: { text: 'Actually, use Outlook instead of Gmail' },
     },
     {
       name: '{{agent}}',
@@ -262,46 +175,31 @@ const examples: ActionExample[][] = [
   [
     {
       name: '{{user1}}',
-      content: {
-        text: 'Ok',
-      },
+      content: { text: 'Ok' },
     },
     {
       name: '{{agent}}',
-      content: {
-        text: 'Deploying your workflow...',
-        actions: ['CREATE_N8N_WORKFLOW'],
-      },
+      content: { text: 'Deploying your workflow...', actions: ['CREATE_N8N_WORKFLOW'] },
     },
   ],
   [
     {
       name: '{{user1}}',
-      content: {
-        text: 'Yes',
-      },
+      content: { text: 'Yes' },
     },
     {
       name: '{{agent}}',
-      content: {
-        text: 'Deploying your workflow now.',
-        actions: ['CREATE_N8N_WORKFLOW'],
-      },
+      content: { text: 'Deploying your workflow now.', actions: ['CREATE_N8N_WORKFLOW'] },
     },
   ],
   [
     {
       name: '{{user1}}',
-      content: {
-        text: 'Do it',
-      },
+      content: { text: 'Do it' },
     },
     {
       name: '{{agent}}',
-      content: {
-        text: 'Deploying your workflow...',
-        actions: ['CREATE_N8N_WORKFLOW'],
-      },
+      content: { text: 'Deploying your workflow...', actions: ['CREATE_N8N_WORKFLOW'] },
     },
   ],
 ];
@@ -347,9 +245,10 @@ export const createWorkflowAction: Action = {
         'N8n Workflow service not available'
       );
       if (callback) {
-        await callback({
-          text: 'N8n Workflow service is not available. Please ensure the plugin is properly configured with N8N_API_KEY and N8N_HOST.',
+        const text = await formatActionResponse(runtime, 'ERROR', {
+          error: 'N8n Workflow service is not available. Check N8N_API_KEY and N8N_HOST.',
         });
+        await callback({ text });
       }
       return { success: false };
     }
@@ -393,39 +292,37 @@ export const createWorkflowAction: Action = {
         switch (effectiveIntent) {
           case 'confirm': {
             const result = await service.deployWorkflow(existingDraft.workflow, userId);
+
+            // Deploy blocked — unresolved credentials
+            if (result.missingCredentials.length > 0) {
+              const text = await formatActionResponse(runtime, 'AUTH_REQUIRED', {
+                connections: result.missingCredentials.map((m) => ({
+                  service: m.credType,
+                  ...(m.authUrl && { authUrl: m.authUrl }),
+                })),
+              });
+              if (callback) await callback({ text });
+              return { success: true };
+            }
+
             await runtime.deleteCache(cacheKey);
 
-            let responseText = `Workflow "${result.name}" deployed successfully!\n\n`;
-            responseText += `**Workflow ID:** ${result.id}\n`;
-            responseText += `**Nodes:** ${result.nodeCount}\n`;
-            responseText += `**Status:** ${result.active ? 'Active' : 'Inactive'}\n`;
-
-            if (result.missingCredentials.length > 0) {
-              responseText += '\n**Action Required:**\n';
-              responseText += 'Please connect the following services in n8n Cloud:\n';
-              for (const credType of result.missingCredentials) {
-                responseText += `- \`${credType}\`\n`;
-              }
-              responseText +=
-                '\nThe workflow will be ready to run once these connections are configured.';
-            } else {
-              responseText += '\nAll credentials configured — workflow is ready to run!';
-            }
-
-            if (callback) {
-              await callback({ text: responseText });
-            }
-
+            const text = await formatActionResponse(runtime, 'DEPLOY_SUCCESS', {
+              workflowName: result.name,
+              workflowId: result.id,
+              nodeCount: result.nodeCount,
+              active: result.active,
+            });
+            if (callback) await callback({ text });
             return { success: true, data: result };
           }
 
           case 'cancel': {
             await runtime.deleteCache(cacheKey);
-
-            if (callback) {
-              await callback({ text: 'Workflow draft cancelled.' });
-            }
-
+            const text = await formatActionResponse(runtime, 'CANCELLED', {
+              workflowName: existingDraft.workflow.name,
+            });
+            if (callback) await callback({ text });
             return { success: true };
           }
 
@@ -450,28 +347,26 @@ export const createWorkflowAction: Action = {
             await runtime.setCache(cacheKey, modifiedDraft);
 
             if (modifiedWorkflow._meta?.requiresClarification?.length) {
-              if (callback) {
-                await callback({ text: formatClarification(modifiedWorkflow) });
-              }
+              const text = await formatActionResponse(runtime, 'CLARIFICATION', {
+                questions: modifiedWorkflow._meta.requiresClarification,
+              });
+              if (callback) await callback({ text });
               return { success: true };
             }
 
-            if (callback) {
-              await callback({ text: formatPreview(modifiedWorkflow) });
-            }
+            const text = await formatActionResponse(
+              runtime,
+              'PREVIEW',
+              buildPreviewData(modifiedWorkflow)
+            );
+            if (callback) await callback({ text });
             return { success: true };
           }
 
           case 'new': {
-            // User wants something completely different — but only if the message actually
-            // describes a new workflow. If generation fails (e.g. vague prompt), recover
-            // by restoring the existing draft instead of losing it.
             if (!userText) {
-              if (callback) {
-                await callback({
-                  text: 'Previous draft cancelled. Please describe the workflow you want to create.',
-                });
-              }
+              const text = await formatActionResponse(runtime, 'EMPTY_PROMPT', {});
+              if (callback) await callback({ text });
               await runtime.deleteCache(cacheKey);
               return { success: false };
             }
@@ -487,43 +382,40 @@ export const createWorkflowAction: Action = {
                 callback
               );
             } catch {
-              // Generation failed (likely vague prompt) — restore the draft and re-show preview
+              // Generation failed — restore the draft and re-show preview
               logger.warn(
                 { src: 'plugin:n8n-workflow:action:create' },
                 'New workflow generation failed — restoring previous draft'
               );
               await runtime.setCache(cacheKey, existingDraft);
-              if (callback) {
-                await callback({
-                  text: `I couldn't generate a new workflow from that message. Here is your current draft:\n\n${formatPreview(
-                    existingDraft.workflow
-                  )}`,
-                });
-              }
+              const text = await formatActionResponse(runtime, 'PREVIEW', {
+                ...buildPreviewData(existingDraft.workflow),
+                restoredAfterFailure: true,
+              });
+              if (callback) await callback({ text });
               return { success: true };
             }
           }
 
           default: {
-            // show_preview fallback — re-display the draft preview
             logger.info(
               { src: 'plugin:n8n-workflow:action:create' },
               'Intent classification unclear — re-showing preview'
             );
-            if (callback) {
-              await callback({ text: formatPreview(existingDraft.workflow) });
-            }
+            const text = await formatActionResponse(
+              runtime,
+              'PREVIEW',
+              buildPreviewData(existingDraft.workflow)
+            );
+            if (callback) await callback({ text });
             return { success: true };
           }
         }
       }
 
       if (!userText) {
-        if (callback) {
-          await callback({
-            text: 'Please provide a description of the workflow you want to create.',
-          });
-        }
+        const text = await formatActionResponse(runtime, 'EMPTY_PROMPT', {});
+        if (callback) await callback({ text });
         return { success: false };
       }
 
@@ -535,12 +427,8 @@ export const createWorkflowAction: Action = {
         `Failed to create workflow: ${errorMessage}`
       );
 
-      if (callback) {
-        await callback({
-          text: `Failed to create workflow: ${errorMessage}\n\nPlease try rephrasing your request or being more specific about the integrations you want to use.`,
-        });
-      }
-
+      const text = await formatActionResponse(runtime, 'ERROR', { error: errorMessage });
+      if (callback) await callback({ text });
       return { success: false };
     }
   },
@@ -548,9 +436,6 @@ export const createWorkflowAction: Action = {
   examples,
 };
 
-/**
- * Generate a workflow draft, store it in cache, and show preview or clarification
- */
 async function generateAndPreview(
   runtime: IAgentRuntime,
   service: N8nWorkflowService,
@@ -574,18 +459,15 @@ async function generateAndPreview(
   };
   await runtime.setCache(cacheKey, draft);
 
-  // ElizaOS allows only one callback per handler invocation (same message ID is reused).
-  // Send either clarification questions or the full preview — never both.
   if (workflow._meta?.requiresClarification?.length) {
-    if (callback) {
-      await callback({ text: formatClarification(workflow) });
-    }
+    const text = await formatActionResponse(runtime, 'CLARIFICATION', {
+      questions: workflow._meta.requiresClarification,
+    });
+    if (callback) await callback({ text });
     return { success: true };
   }
 
-  if (callback) {
-    await callback({ text: formatPreview(workflow) });
-  }
-
+  const text = await formatActionResponse(runtime, 'PREVIEW', buildPreviewData(workflow));
+  if (callback) await callback({ text });
   return { success: true };
 }
