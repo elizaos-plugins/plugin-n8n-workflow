@@ -80,6 +80,16 @@ ${workflowList}`;
       schema: workflowMatchingSchema,
     })) as WorkflowMatchResult;
 
+    // Validate the returned ID actually exists in the provided list
+    if (result.matchedWorkflowId && !workflows.some((wf) => wf.id === result.matchedWorkflowId)) {
+      logger.warn(
+        { src: 'plugin:n8n-workflow:generation:matcher' },
+        `LLM returned non-existent workflow ID "${result.matchedWorkflowId}" — discarding`
+      );
+      result.matchedWorkflowId = null;
+      result.confidence = 'none';
+    }
+
     logger.debug(
       { src: 'plugin:n8n-workflow:generation:matcher' },
       `Workflow match: ${result.matchedWorkflowId || 'none'} (confidence: ${result.confidence})`

@@ -282,18 +282,30 @@ describe('E2E: GET EXECUTIONS', () => {
     ];
 
     const ctx = createE2ERuntime({
-      fetchResponses: new Map([['/executions', () => jsonResponse(200, { data: executions })]]),
+      fetchResponses: new Map([
+        ['/executions', () => jsonResponse(200, { data: executions })],
+        ...listWorkflowsFetchEntries(),
+      ]),
+      useModelResponse: mock(() =>
+        Promise.resolve(
+          createMatchResult({
+            matchedWorkflowId: 'wf-001',
+            confidence: 'high',
+          })
+        )
+      ),
+      workflows: [
+        { id: 'wf-001', name: 'Stripe Payments', active: false },
+        { id: 'wf-002', name: 'Gmail Notifications', active: true },
+      ],
     });
     cleanup = ctx.cleanup;
-
-    // getExecutionsAction reads state?.workflowId (top-level, not state.data)
-    const state: State = { ...ctx.state, workflowId: 'wf-001' };
 
     const callback = ctx.createCallback();
     const result = await getExecutionsAction.handler(
       ctx.runtime,
-      ctx.createMessage('Show executions for workflow wf-001'),
-      state,
+      ctx.createMessage('Show executions for the Stripe workflow'),
+      ctx.state,
       {},
       callback
     );
@@ -307,6 +319,9 @@ describe('E2E: GET EXECUTIONS', () => {
     const fetchCalls = ctx.fetchMock.mock.calls as [string, RequestInit][];
     const execCall = fetchCalls.find(([url]) => url.includes('/executions'));
     expect(execCall![0]).toContain('workflowId=wf-001');
+
+    // Verify LLM was called for matching
+    expect(ctx.runtime.useModel).toHaveBeenCalled();
   });
 });
 

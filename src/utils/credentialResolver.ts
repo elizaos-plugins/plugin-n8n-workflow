@@ -184,22 +184,3 @@ function injectCredentialIds(
 
   return injected;
 }
-
-export function getMissingCredentials(workflow: N8nWorkflow): string[] {
-  const missing: Set<string> = new Set();
-
-  for (const node of workflow.nodes || []) {
-    if (node.credentials) {
-      for (const [credType, credRef] of Object.entries(node.credentials)) {
-        if (typeof credRef === 'object' && 'id' in credRef) {
-          const id = credRef.id;
-          if (!id || id === 'PLACEHOLDER' || id.includes('{{')) {
-            missing.add(credType);
-          }
-        }
-      }
-    }
-  }
-
-  return Array.from(missing);
-}

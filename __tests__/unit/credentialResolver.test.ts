@@ -1,5 +1,5 @@
 import { describe, test, expect, mock } from 'bun:test';
-import { resolveCredentials, getMissingCredentials } from '../../src/utils/credentialResolver';
+import { resolveCredentials } from '../../src/utils/credentialResolver';
 import {
   createValidWorkflow,
   createGmailNode,
@@ -278,70 +278,5 @@ describe('resolveCredentials', () => {
     );
     expect(res.injectedCredentials.get('gmailOAuth2Api')).toBe('config-wins');
     expect(provider.resolve).not.toHaveBeenCalled();
-  });
-});
-
-// ============================================================================
-// getMissingCredentials
-// ============================================================================
-
-describe('getMissingCredentials', () => {
-  test('returns empty array for workflow without credentials', () => {
-    const workflow = createValidWorkflow({ nodes: [createTriggerNode()] });
-    expect(getMissingCredentials(workflow)).toHaveLength(0);
-  });
-
-  test('detects PLACEHOLDER credentials', () => {
-    const result = getMissingCredentials(createWorkflowWithPlaceholderCreds());
-    expect(result).toContain('gmailOAuth2Api');
-  });
-
-  test('detects {{CREDENTIAL_ID}} template placeholders', () => {
-    const workflow = createValidWorkflow({
-      nodes: [
-        createTriggerNode(),
-        {
-          ...createGmailNode(),
-          credentials: { gmailOAuth2Api: { id: '{{CREDENTIAL_ID}}', name: 'Gmail' } },
-        },
-      ],
-    });
-    expect(getMissingCredentials(workflow)).toContain('gmailOAuth2Api');
-  });
-
-  test('detects empty string credential IDs', () => {
-    const workflow = createValidWorkflow({
-      nodes: [
-        createTriggerNode(),
-        {
-          ...createGmailNode(),
-          credentials: { gmailOAuth2Api: { id: '', name: 'Gmail' } },
-        },
-      ],
-    });
-    expect(getMissingCredentials(workflow)).toContain('gmailOAuth2Api');
-  });
-
-  test('does not flag non-placeholder credentials', () => {
-    expect(getMissingCredentials(createValidWorkflow())).toHaveLength(0);
-  });
-
-  test('deduplicates credential types', () => {
-    const workflow = createValidWorkflow({
-      nodes: [
-        createTriggerNode(),
-        {
-          ...createGmailNode({ name: 'Gmail 1' }),
-          credentials: { gmailOAuth2Api: { id: 'PLACEHOLDER', name: 'Gmail' } },
-        },
-        {
-          ...createGmailNode({ name: 'Gmail 2' }),
-          credentials: { gmailOAuth2Api: { id: 'PLACEHOLDER', name: 'Gmail' } },
-        },
-      ],
-    });
-    const result = getMissingCredentials(workflow);
-    expect(result).toHaveLength(1);
-    expect(result[0]).toBe('gmailOAuth2Api');
   });
 });

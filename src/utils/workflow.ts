@@ -4,7 +4,6 @@ import { getNodeDefinition } from './catalog';
 export function validateWorkflow(workflow: N8nWorkflow): WorkflowValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
-  let needsFix = false;
 
   // 1. Check nodes array exists and is non-empty
   if (!workflow.nodes || !Array.isArray(workflow.nodes)) {
@@ -46,10 +45,9 @@ export function validateWorkflow(workflow: N8nWorkflow): WorkflowValidationResul
     nodeNames.add(node.name);
     nodeMap.set(node.name, node);
 
-    // Check position
+    // Check position (positionNodes() will fix this after validation)
     if (!node.position || !Array.isArray(node.position) || node.position.length !== 2) {
-      warnings.push(`Node "${node.name}" has invalid position, will auto-fix`);
-      needsFix = true;
+      warnings.push(`Node "${node.name}" has invalid position, will be auto-positioned`);
     }
 
     // Check parameters
@@ -127,12 +125,6 @@ export function validateWorkflow(workflow: N8nWorkflow): WorkflowValidationResul
     }
   }
 
-  // 7. Auto-fix if needed
-  let fixedWorkflow: N8nWorkflow | undefined;
-  if (needsFix && errors.length === 0) {
-    fixedWorkflow = autoFixWorkflow(workflow);
-  }
-
   if (errors.length > 0) {
     return { valid: false, errors, warnings };
   }
@@ -141,7 +133,6 @@ export function validateWorkflow(workflow: N8nWorkflow): WorkflowValidationResul
     valid: true,
     errors: [],
     warnings,
-    fixedWorkflow,
   };
 }
 
@@ -261,29 +252,6 @@ export function validateNodeInputs(workflow: N8nWorkflow): string[] {
   }
 
   return warnings;
-}
-
-function autoFixWorkflow(workflow: N8nWorkflow): N8nWorkflow {
-  const fixed = { ...workflow };
-  fixed.nodes = [...workflow.nodes];
-
-  let x = 250;
-  const y = 300;
-  const xSpacing = 250;
-
-  for (let i = 0; i < fixed.nodes.length; i++) {
-    const node = { ...fixed.nodes[i] };
-
-    // Fix missing or invalid position
-    if (!node.position || !Array.isArray(node.position) || node.position.length !== 2) {
-      node.position = [x, y];
-      x += xSpacing;
-    }
-
-    fixed.nodes[i] = node;
-  }
-
-  return fixed;
 }
 
 export function positionNodes(workflow: N8nWorkflow): N8nWorkflow {

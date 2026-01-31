@@ -216,7 +216,6 @@ export interface WorkflowValidationResult {
   valid: boolean;
   errors: string[];
   warnings: string[];
-  fixedWorkflow?: N8nWorkflow;
 }
 
 // Credential provider types
@@ -317,15 +316,5 @@ export class N8nApiError extends Error {
   ) {
     super(message);
     this.name = 'N8nApiError';
-  }
-}
-
-export class WorkflowValidationError extends Error {
-  constructor(
-    message: string,
-    public errors: string[]
-  ) {
-    super(message);
-    this.name = 'WorkflowValidationError';
   }
 }
